@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paperpilot-agent"
-version = "0.1.0"
-description = "Evidence-grounded paper and public repository analysis with LangGraph and MCP"
+version = "0.2.0"
+description = "Paper-to-code research workspaces, reviewed experiment runs and protocol-aware comparisons"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest==9.2.0", "pytest-asyncio==1.4.1", "ruff==0.17.3", "reportlab==5.1.0"]
+
+[project.scripts]
+paperpilot = "paperpilot.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["paperpilot*"]

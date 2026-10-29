@@ -1,174 +1,139 @@
 # PaperPilot Agent
 
-[English](README.en.md) · [架构](docs/architecture.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
+[English](README.en.md) · [架构](docs/architecture.md) · [复现流程](docs/reproduction.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
 
-基于 LangGraph 和 MCP 的科研与公开代码分析助手。上传 PDF 或输入 GitHub
-仓库地址，执行可观察的工具工作流，输出带页码或 commit 固定行号引用的 Markdown。
+**论文 × 代码 × 实验结果。** 为已有 Agent 和科研使用者提供可追溯的实验复现工作区。
+关联论文 PDF 与公开 GitHub 版本，讲解方法及代码对应关系，运行经过审阅的 CPU
+实验，并按实验协议对照实测指标与论文结果。
 
-**状态：0.1.0，单用户工作区。默认 Mock 模式仅提供真实检索证据预览，
-不调用模型，也不冒充模型分析。Live 模式支持 OpenAI 兼容聊天接口与 Ollama；
-运行示例见下方报告与截图。**
+## 可以用它做什么
 
-## 工作流程
+- **联合讲解**：论文方法对应哪个类、函数或配置；引用物理页码和固定 commit 的代码行号。
+- **复现准备**：提取目标表格、数据集、划分、训练与评估条件，列出未知项及命令草案。
+- **实验执行**：审阅配方后，用独立 Docker 容器运行公开代码，记录版本、日志、时间和实际指标。
+- **结果对照**：比较单位、实验协议和容差；小规模验证、协议不一致或基准未核实均明确标为不可直接比较。
+- **结果讲解**：将已导入的对照作为实验来源，联合说明实际数值、论文依据与协议差异。
+- **接入已有 Agent**：通过 [复现 Skill](agent-skills/paperpilot-reproduce/SKILL.md)、CLI 或 MCP 使用证据和实验工具，沿用已有 Agent 的模型。
 
-```mermaid
-flowchart LR
-    Input[PDF / 公开仓库] --> Index[页码或行号分块]
-    Index --> Store[(SQLite)]
-    Task[用户任务] --> Consent{Live 数据传输确认}
-    Consent --> Plan[加载 Skill / 生成工具计划]
-    Plan --> Tools[MCP stdio 工具调用]
-    Tools --> More{还有步骤?}
-    More -->|有| Tools
-    More -->|无| Report[证据整理与结构化报告]
-    Store --> Tools
-    Report --> Audit[引用存在性校验]
-    Audit -->|有效| Markdown[Markdown 与原始证据]
-    Audit -->|最多一次纠正| Report
-```
+0.2.0 面向个人工作区。选实验、准备依赖和编写指标适配器由使用者或已有 Agent
+完成；Runner 自动处理固定快照下载、受限执行、日志与指标比较。它不保证任意论文
+一键复现，也不把脚本跑通当作论文指标达标。
 
-系统只有一个 Agent。LangGraph 使用 5 个有实际职责的节点：确认、计划、
-工具执行循环、生成、引用审核；图的起止点由框架管理。
-状态和确认暂停点保存在 SQLite；任务事件可由接口和页面查看。
+## 两种使用方式
 
-## 能力与边界
+### 已有 Agent：Skill + CLI
 
-| 能力 | 实现 |
-|---|---|
-| PDF 分析 | pypdf 提取文字，LangChain 切分，保留物理页码；不做 OCR |
-| 代码分析 | GitHub API + 官方归档读取，固定 commit，优先核心源码，最多 24 个文件；不执行代码 |
-| RAG | 字符 2–4 gram 稀疏哈希向量，余弦检索；无需 GPU 或 embedding API |
-| MCP | 官方 Python SDK **2.3.0**：MCPServer + Client，真实 stdio 子进程通信 |
-| Skills | 两个标准 SKILL.md；运行时加载正文、限制可用工具，进入规划和报告提示 |
-| 模型 | LangChain ChatOpenAI；模型返回经过 Pydantic 校验的计划和报告 JSON |
-| 引用 | 模型仅能引用实际检索的来源 ID；未知引用导致失败，不自动掩盖 |
-| 交互 | FastAPI + 中文 Streamlit 页面，任务状态、工具记录、引用、报告下载 |
-
-稀疏向量检索是词面检索，**不等于语义 embedding**，中英文跨语言问题建议附
-英文关键词。引用存在性校验不能证明推理正确、引用蕴含或彻底解决幻觉。
-报告不能替代全文精读或实际运行复现。当前不含任意互联网搜索、多租户、登录或沙箱执行。
-
-## 安装与启动
-
-Python 3.12+（锁定的 NumPy/SciPy 版本要求 3.12）。Windows PowerShell：
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.lock
-.\.venv\Scripts\python -m pip install -e '.[dev]'
-Copy-Item .env.example .env
-.\.venv\Scripts\python -m uvicorn paperpilot.api:create_app --factory --host 127.0.0.1 --port 8000
-```
-
-另开终端，在项目根目录执行：
-
-```powershell
-.\.venv\Scripts\python -m streamlit run paperpilot/ui.py --server.address 127.0.0.1 --browser.gatherUsageStats false
-```
-
-Linux/macOS 使用 `python3 -m venv .venv`，将上面的解释器路径换为 `.venv/bin/python`。
-打开 `http://localhost:8501`；API 文档位于 `http://localhost:8000/docs`。
-始终使用单个 API worker，队列最多 8 个任务、最多 2 个并发执行。
-
-## 配置真实模型
-
-修改本地 `.env`，密钥只能由环境或本地配置提供，不提交 Git：
-
-```dotenv
-PAPERPILOT_MODE=live
-OPENAI_BASE_URL=https://your-compatible-endpoint/v1
-OPENAI_MODEL=your-model
-OPENAI_API_KEY=your-local-secret
-```
-
-本地 Ollama 已有模型时，可改为：
-
-```dotenv
-PAPERPILOT_MODE=live
-OPENAI_BASE_URL=http://127.0.0.1:11434/v1
-OPENAI_MODEL=your-installed-model
-OPENAI_API_KEY=ollama
-```
-
-百炼混合思考模型可另设 `PAPERPILOT_MODEL_EXTRA_BODY={"enable_thinking":false}`，
-其他服务默认 `{}`。详见部署说明。
-
-重启 API。每次 Live 任务在模型调用前暂停，页面确认后才发送任务与检索片段。
-模型必须能遵守 JSON 指令；接口、限流、结构化输出不兼容时任务如实失败，
-不会退回 Mock。正常任务调用模型两次；引用不合法时最多增加一次纠正请求，
-仍无效则失败，不自动重试网络请求。应用本身不需要 GPU；Ollama 的资源需求取决于所选模型。
-容器中 `localhost` 指容器自身，需使用模型服务的可达地址。
-
-## 示例与测试
+Python 3.12+，在项目根目录安装：
 
 ```bash
-python scripts/make_example.py
-python -m pytest -q
-ruff check .
-# API 已启动时，访问公开仓库并分析原创示例 PDF：
-python scripts/smoke.py
+python -m venv .venv
+# 激活虚拟环境；Windows PowerShell: .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.lock
+python -m pip install -e .
+paperpilot --help
 ```
 
-示例 PDF 是明确标注的原创教育测试材料，不是发表过的研究结果。
-预期页码与事实见 [examples/expected.md](examples/expected.md)。
-默认测试不访问外网、不使用付费 API，包含真实 MCP 传输、图执行、
-引用拒绝、确认拒绝及确认后重建图继续运行。
-`ContractModel` 仅用于契约测试，不代表真实模型能力通过。
-
-真实 Live 产物：[示例 PDF 报告](docs/examples/paper-report.md)、
-[Click 仓库报告](docs/examples/repository-report.md)。
-报告来自实际运行，不是预置成功结果。
-
-![服务器容器实际 Live 运行：已完成 5 次工具调用，22 条证据](docs/screenshots/server-live.jpg)
-
-另有 [Mock 模式界面](docs/screenshots/mock-paper.jpg)，展示无需模型 API 的检索预览。
-
-## MCP 独立使用
+将 `agent-skills/paperpilot-reproduce` 放到 Agent 支持的 Skills 目录，或让 Agent
+读取该 SKILL.md。CLI 证据流程不调用模型，不需要额外 API key，也不要求启动 Web。
 
 ```bash
-python -m paperpilot.mcp_server
+paperpilot init --pdf paper.pdf --repo https://github.com/owner/repo --title "目标实验"
+paperpilot evidence --study STUDY_ID --query "method dataset split training evaluation"
+paperpilot schema recipe
 ```
 
-这是 stdio 服务，不能把普通日志输出到 stdout。工具包括 `source_overview`、
-`paper_search`、`code_search`，操作已由 API 导入的来源。
-客户端可用 `mcp.Client(StdioServerParameters(command=..., args=["-m", "paperpilot.mcp_server"],
-env={"PAPERPILOT_DATA_DIR": "..."}))` 连接。完整可执行示例见测试。
+使用已有 Agent 讲解联合证据、编写配方与适配器。主机需要 Docker 才能运行实验：
 
-## Docker 与服务器
+```bash
+paperpilot inspect recipe.json
+# 核对配方、适配器、镜像、代码版本和资源预算，批准后填入完整摘要：
+paperpilot run recipe.json --approve APPROVAL_DIGEST
+paperpilot compare data/runs/RUN_ID/comparison-input.json --output data/comparison.md
+paperpilot record data/runs/RUN_ID/comparison-input.json --study STUDY_ID
+```
+
+完整可运行案例见 [TCN Adding Problem](examples/tcn-adding/README.md)。
+
+### Web：联合研究与结果工作台
 
 ```bash
 docker compose up -d --build --wait
-docker compose logs -f
-docker compose down
 ```
 
-访问端口默认只绑定 `127.0.0.1`，数据保存在命名卷。卷中是用户文档片段、任务和
-checkpoint，不应上传到 GitHub。镜像使用普通用户执行，不包含任何密钥。
-无 Docker 的 Linux 可使用 [部署脚本](deploy/install-user-service.sh) 启动隔离的
-systemd 用户服务。服务器访问与重启方式见 [部署说明](docs/deployment.md)。
+打开 `http://localhost:8501`，API 文档在 `http://localhost:8000/docs`。
+依次导入 PDF 和公开仓库，建立工作区，选择讲解、复现规划或差异排查任务。
+运行完成后可上传 `comparison-input.json`，查看并下载结果对照表。
 
-本版本面向个人工作区；服务实例中的历史和来源共享。公开多用户服务前需要另行
-实现认证、访问隔离、反向代理和数据保留策略；目前使用 SSH 隧道访问即可。
+默认 Mock 模式执行真实解析和 MCP 检索，仅输出明确标记的证据预览。
+Web 联合推理需配置 OpenAI 兼容模型，再逐任务确认数据传输：
 
-## 工程结构
-
-```text
-paperpilot/       API、工作流、MCP、解析检索、存储和 UI
-  skills/        实际加载的两个 SKILL.md
-tests/           离线单元、MCP、图与 API 集成测试
-scripts/         原创 PDF 生成器、真实服务 smoke 测试
-examples/        可公开示例及预期事实
-deploy/          用户级服务部署脚本
-docs/            架构、部署、测试与示例报告
+```dotenv
+PAPERPILOT_MODE=live
+OPENAI_BASE_URL=https://your-compatible-provider/v1
+OPENAI_MODEL=your-model
+OPENAI_API_KEY=your-private-key
 ```
 
-技术依据：[LangGraph Graph API](https://docs.langchain.com/oss/python/langgraph/graph-api)、
-[MCP v2 客户端](https://py.sdk.modelcontextprotocol.io/client/)、
-[Agent Skills 规范](https://agentskills.io/specification)、
-[ChatOpenAI](https://docs.langchain.com/oss/python/integrations/chat/openai)、
-[Ollama 兼容接口](https://docs.ollama.com/api/openai-compatibility)。
-具体运行依赖固定在 `requirements.lock`；主库版本固定在 `pyproject.toml`。
+从 `.env.example` 创建本地 `.env`，不要提交密钥。Ollama 可使用其 `/v1` 兼容
+地址与 `ollama` key；具体本地模型尚未实机验证。Windows 原生启动、供应商参数、
+SSH 访问与镜像下载见 [部署说明](docs/deployment.md)。
 
-MIT License。原始论文和被分析仓库仍遵循各自权利与许可，不随本项目重新授权。
+## 工作原理
+
+```mermaid
+flowchart LR
+    P[论文 PDF] --> S[联合工作区 / SQLite]
+    C[公开代码 / 固定 commit] --> S
+    S --> E[MCP 联合证据检索]
+    E --> A[已有 Agent / Web LangGraph]
+    A --> X[讲解 / 方法映射 / 实验草案]
+    X --> R[审阅配方与批准摘要]
+    R --> D[CPU Docker Runner]
+    D --> M[真实指标与日志]
+    M --> V[协议 / 单位 / 容差比较]
+    V --> T[结果工作台与 Markdown]
+```
+
+Web 使用单个 LangGraph Agent，含确认、规划、MCP 工具循环、生成、引用审核五个
+节点。联合报告的每条方法映射分别引用论文和代码。非法引用最多纠正一次；模型
+失败直接报告错误。SQLite checkpoint 保存待确认状态，事件记录保留工具过程。
+
+检索使用 CPU 字符 2–4 gram 稀疏哈希向量及余弦相似度，无独立向量数据库。
+它是词面检索，跨语言问题应补充英文关键词。MCP 使用官方 Python SDK **2.3.0**
+与真实 stdio 通信。详细数据结构和执行边界见 [架构说明](docs/architecture.md)。
+
+## 边界与结果解释
+
+| 项目 | 当前范围 |
+|---|---|
+| PDF | 可提取文字，最多 20 MB / 150 页；无 OCR、图表视觉理解 |
+| 仓库分析 | 最多 24 个选定文件，每文件前 100 KB、总索引 2 MB；不是全仓覆盖 |
+| Runner | 独立主机 CLI、Linux CPU 容器、无网络或 GPU；预算最多 30 分钟 / 4 CPU / 8 GB |
+| 环境 | 需要预先构建的本地镜像；不自动安装依赖、修补仓库或无限重试 |
+| 结果可信度 | 保存原始指标、日志和哈希；API 上传结果标记为外部提交，不认证执行真实性 |
+| 复现结论 | 协议按提交内容核对；引用存在或数值接近均不能单独证明完整复现 |
+| 部署 | 单用户共享工作区，无登录和租户隔离；端口默认仅绑定本机 |
+
+Web 容器不挂载 Docker socket。运行数据、上传原文和模型密钥不进入 Git。
+Runner 适用于经过审阅的代码，不是面向恶意代码的托管沙箱服务。
+
+## 开发
+
+```bash
+python -m pip install -e '.[dev]'
+python -m pytest -q
+ruff check .
+```
+
+测试涵盖真实 MCP、联合来源、映射引用、确认恢复、结果协议、批准摘要、执行失败
+和 API 持久化。CI 在 Windows/Linux、Python 3.12/3.13 上运行，并构建和启动 Web
+容器。实际论文训练需要额外的实验镜像，见 [测试说明](docs/testing.md)。
+
+技术依据：[LangGraph](https://docs.langchain.com/oss/python/langgraph/graph-api)、
+[MCP Python SDK](https://py.sdk.modelcontextprotocol.io/)、
+[Agent Skills](https://agentskills.io/specification)、
+[Docker 运行参数](https://docs.docker.com/engine/containers/run/)。
+
+MIT License。被分析的论文、代码和数据遵循各自的权利与许可。

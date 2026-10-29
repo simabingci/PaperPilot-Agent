@@ -6,6 +6,18 @@
 再分别启动 API 和 UI。API 的导入路径为 `paperpilot.api:create_app --factory`。
 Web 是 `streamlit run paperpilot/ui.py --server.headless true`。
 
+Windows PowerShell 创建和启动虚拟环境：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.lock
+.\.venv\Scripts\python -m pip install -e '.[dev]'
+Copy-Item .env.example .env
+.\.venv\Scripts\python -m uvicorn paperpilot.api:create_app --factory --host 127.0.0.1 --port 8000
+# 另开终端：
+.\.venv\Scripts\python -m streamlit run paperpilot/ui.py --server.address 127.0.0.1 --browser.gatherUsageStats false
+```
+
 Docker Compose 默认监听 `127.0.0.1:8000`（API）和 `127.0.0.1:8501`（Web），
 镜像普通用户 UID 10001 运行。SQLite、片段、事件和 checkpoint 保存在命名卷。
 `.dockerignore` 排除密钥、运行数据、工具与 Git；不要把 `.env` COPY 进镜像。
@@ -116,3 +128,18 @@ Base URL、模型权限和 key 必须匹配地域。API key 不代表免费资�
 - 源 PDF 二进制不持久化，提取文本、文件名及哈希会保存在 SQLite。
 - 仓库最多读取 24 个文件；查看报告中的采样清单，不能当作全仓库覆盖。
 - 分享源码前使用 `git ls-files` 核对文件；不分享 data 卷、`.env` 或未获授权的 PDF。
+
+## 已有 Agent 与主机 Runner
+
+CLI/MCP 的证据模式不需要 Web 或额外模型 key。读取项目中的
+`agent-skills/paperpilot-reproduce/SKILL.md`，然后使用虚拟环境的 `paperpilot` 命令。
+外部 Agent 生成分析和配方，PaperPilot 提供固定版本证据及指标比较。
+
+Runner 单独安装在有 Docker 的主机，Web 不挂载 Docker socket，也不启动实验
+代码。Windows 使用 Docker Desktop 的 Linux 容器模式；真实 CPU 实验已在 Linux
+Docker Engine 验证，Windows Docker Desktop 的实验执行尚未实机验证。
+镜像与适配器准备、具体运行批准和结果导入见 [复现流程](reproduction.md)。
+
+从 0.1 更新时保留命名卷，重建 API/Web 镜像即可。Store 会创建 results 表，旧来源
+和研究任务保留；旧任务没有 structured_report 时页面仍可显示 Markdown。更新会
+中断执行中的研究任务，应在无运行任务时操作。Runner 记录独立保存在主机 data/runs。

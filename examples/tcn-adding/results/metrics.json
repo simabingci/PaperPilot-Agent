@@ -1,0 +1,16 @@
+{
+  "protocol": {
+    "dataset": "Adding Problem, sequence length 600",
+    "split": "512 train / 128 held-out generated sequentially; torch and numpy seed 1111",
+    "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+    "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+    "training_budget": "20 Adam updates, batch 32, learning rate 0.004, CPU",
+    "evaluation": "Mean squared error on held-out synthetic sequences"
+  },
+  "metrics": {
+    "mse": 0.2443082481622696
+  },
+  "units": {
+    "mse": "MSE"
+  }
+}

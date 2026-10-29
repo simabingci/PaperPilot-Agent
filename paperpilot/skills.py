@@ -13,7 +13,7 @@ class Skill:
 
 
 def load_skill(kind: str) -> Skill:
-    name = "paper-analysis" if kind == "paper" else "repository-analysis"
+    name = {"paper": "paper-analysis", "repository": "repository-analysis", "study": "paper-reproduction"}[kind]
     path = Path(__file__).parent / "skills" / name / "SKILL.md"
     _, header, body = path.read_text(encoding="utf-8").split("---", 2)
     metadata = yaml.safe_load(header)

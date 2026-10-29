@@ -1,0 +1,46 @@
+{
+  "reference": {
+    "paper_title": "An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling",
+    "paper_url": "https://arxiv.org/abs/1803.01271",
+    "protocol": {
+      "dataset": "Adding Problem, sequence length 600",
+      "split": "unknown",
+      "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+      "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+      "training_budget": "unknown",
+      "evaluation": "Mean squared error on held-out synthetic sequences"
+    },
+    "metrics": [
+      {
+        "name": "mse",
+        "value": 0.000058,
+        "unit": "MSE",
+        "direction": "lower",
+        "absolute_tolerance": 0.00001,
+        "relative_tolerance": 0.0,
+        "paper_location": "PDF physical page 13, Table 4: Adding Prob. 600 (loss), TCN 5.8e-5; architecture Table 2, page 12"
+      }
+    ]
+  },
+  "observed": {
+    "protocol": {
+      "dataset": "Adding Problem, sequence length 600",
+      "split": "512 train / 128 held-out generated sequentially; torch and numpy seed 1111",
+      "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+      "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+      "training_budget": "20 Adam updates, batch 32, learning rate 0.004, CPU",
+      "evaluation": "Mean squared error on held-out synthetic sequences"
+    },
+    "metrics": {
+      "mse": 0.2443082481622696
+    },
+    "units": {
+      "mse": "MSE"
+    }
+  },
+  "scope": "smoke",
+  "repository_commit": "2f8c2b817050206397458dfd1f5a25ce8a32fe65",
+  "reference_reviewed": true,
+  "artifact_sha256": "0ccaf0304b90a0991a0c31e6cd39fa65d0521e83fe18e7adf275703640781910",
+  "notes": "Only 20 CPU optimization steps on 512 synthetic training cases and 128 held-out cases. Full paper budget and split are not verified. This demonstrates running author code and comparison, not reproduced paper accuracy."
+}

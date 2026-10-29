@@ -13,6 +13,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field, StringConstraints
 
 from paperpilot.config import Settings
+from paperpilot.experiments import ResultSubmission, record_result
 from paperpilot.ingest import MAX_PDF_BYTES, ingest_github, ingest_pdf
 from paperpilot.store import Store
 from paperpilot.workflow import build_graph
@@ -22,6 +23,7 @@ logger = logging.getLogger("paperpilot")
 
 class RepositoryInput(BaseModel):
     url: str = Field(max_length=300)
+    commit: str | None = Field(default=None, pattern=r"^[a-f0-9]{40}$")
 
 
 class TaskInput(BaseModel):
@@ -31,6 +33,13 @@ class TaskInput(BaseModel):
 
 class Approval(BaseModel):
     approved: bool
+
+
+class StudyInput(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    paper_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    repository_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    objective: str = Field(min_length=2, max_length=2000)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -54,7 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 task.cancel()
             await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-    app = FastAPI(title="PaperPilot Agent", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="PaperPilot Agent", version="0.2.0", lifespan=lifespan)
     app.state.store = store
 
     async def run(job_id: str, value) -> None:
@@ -73,7 +82,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     store.event(job_id, "cancelled", "用户拒绝模型数据传输")
                 else:
                     job.update(status="completed", markdown=result["markdown"],
-                               evidence=result["evidence"], plan=result["actions"], skill=result["skill"]["name"])
+                               evidence=result["evidence"], plan=result["actions"], skill=result["skill"]["name"],
+                               structured_report=result["report"])
                     store.event(job_id, "completed", "报告已生成")
             except Exception as exc:
                 # The job boundary owns error handling: record failure, never invent a success report.
@@ -107,7 +117,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     def health():
         return dict(status="ok", mode=config.mode, model=config.model if config.mode == "live" else None,
-                    retrieval="character-hashing sparse vectors", version="0.1.0")
+                    retrieval="character-hashing sparse vectors", version="0.2.0")
+
+    @app.get("/sources")
+    def sources():
+        return store.sources()
+
+    @app.post("/studies", status_code=201)
+    def create_study(body: StudyInput):
+        return store.add_study(body.paper_id, body.repository_id, body.title, body.objective)
+
+    @app.get("/studies/{study_id}/results")
+    def results(study_id: str):
+        if store.source(study_id)["kind"] != "study":
+            raise ValueError("需要复现工作区 ID")
+        return store.results(study_id)
+
+    @app.post("/studies/{study_id}/results", status_code=201)
+    def attach_result(study_id: str, body: ResultSubmission):
+        return record_result(store, study_id, body, "uploaded; execution not attested by API")
 
     @app.post("/sources/pdf", status_code=201)
     async def upload_pdf(file: Annotated[UploadFile, File()]):
@@ -119,7 +147,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def upload_repository(body: RepositoryInput):
         async with httpx.AsyncClient(timeout=25, follow_redirects=False,
                                      headers={"User-Agent": "PaperPilot-Agent/0.1"}) as client:
-            return await ingest_github(body.url, store, client)
+            return await ingest_github(body.url, store, client, body.commit)
 
     @app.get("/sources/{source_id}")
     def source(source_id: str):

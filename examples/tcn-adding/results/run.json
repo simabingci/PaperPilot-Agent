@@ -1,0 +1,138 @@
+{
+  "id": "db3c34cb83de4bb3a850f922a44713af",
+  "started_at": "2026-10-29T14:31:27.712885+00:00",
+  "status": "completed",
+  "review": {
+    "recipe": {
+      "schema_version": "1",
+      "name": "TCN Adding Problem T=600 CPU smoke",
+      "repository_url": "https://github.com/locuslab/TCN",
+      "repository_commit": "2f8c2b817050206397458dfd1f5a25ce8a32fe65",
+      "image": "paperpilot-tcn:cpu",
+      "adapter": "adapter.py",
+      "command": [
+        "python",
+        "/recipe/adapter.py"
+      ],
+      "timeout_seconds": 180,
+      "memory_mb": 2048,
+      "cpus": 1.0,
+      "scope": "smoke",
+      "reference": {
+        "paper_title": "An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling",
+        "paper_url": "https://arxiv.org/abs/1803.01271",
+        "protocol": {
+          "dataset": "Adding Problem, sequence length 600",
+          "split": "unknown",
+          "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+          "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+          "training_budget": "unknown",
+          "evaluation": "Mean squared error on held-out synthetic sequences"
+        },
+        "metrics": [
+          {
+            "name": "mse",
+            "value": 5.8e-05,
+            "unit": "MSE",
+            "direction": "lower",
+            "absolute_tolerance": 1e-05,
+            "relative_tolerance": 0.0,
+            "paper_location": "PDF physical page 13, Table 4: Adding Prob. 600 (loss), TCN 5.8e-5; architecture Table 2, page 12"
+          }
+        ]
+      },
+      "reference_reviewed": true,
+      "notes": "Only 20 CPU optimization steps on 512 synthetic training cases and 128 held-out cases. Full paper budget and split are not verified. This demonstrates running author code and comparison, not reproduced paper accuracy."
+    },
+    "adapter_sha256": "90f0fe6c28b603679b3b36ef26f076e0540ab6cfe2b27a33b0481a8ab58f2dff",
+    "image_id": "sha256:f9bdb108f44e794d202ab0124a3e0bec4e3f65e78f51560ab8ea5b320db75b88",
+    "approval_digest": "44e195aa9fe806117a85d555f790ba8972d1e3c80ccd3a3a54544b3f5d84779f"
+  },
+  "source_archive_sha256": "1e9f05c7f4b9e8790207c88a2b9c79f5e0a04d1a6e5ba8c61fb976e0467a5598",
+  "exit_code": 0,
+  "submission": {
+    "reference": {
+      "paper_title": "An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling",
+      "paper_url": "https://arxiv.org/abs/1803.01271",
+      "protocol": {
+        "dataset": "Adding Problem, sequence length 600",
+        "split": "unknown",
+        "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+        "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+        "training_budget": "unknown",
+        "evaluation": "Mean squared error on held-out synthetic sequences"
+      },
+      "metrics": [
+        {
+          "name": "mse",
+          "value": 5.8e-05,
+          "unit": "MSE",
+          "direction": "lower",
+          "absolute_tolerance": 1e-05,
+          "relative_tolerance": 0.0,
+          "paper_location": "PDF physical page 13, Table 4: Adding Prob. 600 (loss), TCN 5.8e-5; architecture Table 2, page 12"
+        }
+      ]
+    },
+    "observed": {
+      "protocol": {
+        "dataset": "Adding Problem, sequence length 600",
+        "split": "512 train / 128 held-out generated sequentially; torch and numpy seed 1111",
+        "preprocessing": "Two uniform values selected by a binary mask; sum as target",
+        "model": "TCN, kernel 8, 8 levels, 24 hidden channels, dropout 0",
+        "training_budget": "20 Adam updates, batch 32, learning rate 0.004, CPU",
+        "evaluation": "Mean squared error on held-out synthetic sequences"
+      },
+      "metrics": {
+        "mse": 0.2443082481622696
+      },
+      "units": {
+        "mse": "MSE"
+      }
+    },
+    "scope": "smoke",
+    "repository_commit": "2f8c2b817050206397458dfd1f5a25ce8a32fe65",
+    "reference_reviewed": true,
+    "artifact_sha256": "0ccaf0304b90a0991a0c31e6cd39fa65d0521e83fe18e7adf275703640781910",
+    "notes": "Only 20 CPU optimization steps on 512 synthetic training cases and 128 held-out cases. Full paper budget and split are not verified. This demonstrates running author code and comparison, not reproduced paper accuracy."
+  },
+  "comparison": {
+    "rows": [
+      {
+        "metric": "mse",
+        "paper": 5.8e-05,
+        "actual": 0.2443082481622696,
+        "unit": "MSE",
+        "delta": 0.2442502481622696,
+        "tolerance": 1e-05,
+        "direction": "lower",
+        "status": "not_comparable",
+        "reasons": [
+          "实验协议不一致或存在未确认项",
+          "本次仅为小规模流程验证"
+        ],
+        "paper_location": "PDF physical page 13, Table 4: Adding Prob. 600 (loss), TCN 5.8e-5; architecture Table 2, page 12"
+      }
+    ],
+    "protocol_differences": [
+      {
+        "field": "split",
+        "paper": "unknown",
+        "actual": "512 train / 128 held-out generated sequentially; torch and numpy seed 1111"
+      },
+      {
+        "field": "training_budget",
+        "paper": "unknown",
+        "actual": "20 Adam updates, batch 32, learning rate 0.004, CPU"
+      }
+    ],
+    "comparable": false,
+    "conclusion": "按提交的协议与容差比较；不能单独证明论文已经完整复现。"
+  },
+  "duration_seconds": 5.827,
+  "artifact_hashes": {
+    "review.json": "efed2a725bffe406916bb0da0b20e946cbfb88ed2a49f74d86a4fcb9b0787988",
+    "stdout.log": "77ae787e98a46ee377430ba985f96a1493c85e13831c536dfcd6260ee85a2162",
+    "stderr.log": "220904df62c78cf2fd875381e3f8b99af90da7bc0028cd4aa4df4dcf0240a1c2"
+  }
+}

@@ -5,8 +5,10 @@ from sklearn.feature_extraction.text import HashingVectorizer
 from paperpilot.store import Store
 
 
-def search(store: Store, source_id: str, query: str, limit: int = 5) -> list[dict]:
-    chunks = store.chunks(source_id)
+def search(store: Store, source_id: str, query: str, limit: int = 5, path: str | None = None) -> list[dict]:
+    chunks = [c for c in store.chunks(source_id) if path is None or c.get("path") == path]
+    if not chunks:
+        return []
     vectorizer = HashingVectorizer(analyzer="char", ngram_range=(2, 4), n_features=2**18,
                                   alternate_sign=False, norm="l2", lowercase=True)
     matrix = vectorizer.transform(c["text"] for c in chunks)

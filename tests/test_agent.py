@@ -18,7 +18,8 @@ async def test_mcp_inprocess_and_stdio_are_real_calls(store, pdf_bytes, tmp_path
     source = ingest_pdf(pdf_bytes, "fixture.pdf", store)
     async with Client(create_server(store)) as client:
         tools = await client.list_tools()
-        assert {t.name for t in tools.tools} == {"source_overview", "paper_search", "code_search"}
+        assert {t.name for t in tools.tools} == {"source_overview", "paper_search", "code_search",
+                                               "study_search", "list_sources", "study_results"}
         result = await client.call_tool("paper_search", {"source_id": source["id"], "query": "Adam"})
         assert result.structured_content["matches"][0]["page"] == 2
         wrong_kind = await client.call_tool("code_search", {"source_id": source["id"], "query": "main"})

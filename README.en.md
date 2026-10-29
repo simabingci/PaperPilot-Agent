@@ -1,136 +1,115 @@
 # PaperPilot Agent
 
-[简体中文](README.md) · [Architecture](docs/architecture.md) · [Deployment](docs/deployment.md) · [Testing](docs/testing.md)
+[简体中文](README.md) · [Architecture](docs/architecture.md) · [Reproduction workflow](docs/reproduction.md) · [Deployment](docs/deployment.md)
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
 
-An evidence-grounded research and public-code assistant built with LangGraph,
-LangChain, MCP v2, FastAPI and Streamlit. It reads text PDFs or a bounded snapshot
-of a public GitHub repository, plans tool calls, retrieves evidence and exports a
-Markdown report with physical PDF pages or commit-pinned file/line citations.
+**Paper × code × experimental evidence.** A research reproduction workspace for
+existing agents and individual researchers. Link a PDF to a public repository
+snapshot, explain method-to-code mappings, execute reviewed CPU experiments, and
+compare measured metrics with paper results under explicit experimental protocols.
 
-**Version 0.1.0 is a single-user workspace. Mock mode is the default: real ingestion,
-retrieval and MCP calls, with explicitly labeled extractive evidence previews.
-It performs no LLM reasoning. Live mode uses a configured OpenAI-compatible chat
-endpoint or Ollama, and requires per-task consent before model data transmission.**
+## What it adds to an existing agent
 
-## Architecture
+- Joint paper/code retrieval with physical pages and commit-pinned line citations.
+- A reusable [reproduction Skill](agent-skills/paperpilot-reproduce/SKILL.md) and CLI:
+  use your agent's model without a second model API subscription.
+- Reviewed recipes bound to adapter bytes and a resolved local image ID.
+- Offline CPU containers with time, memory and CPU limits; raw logs and metrics.
+- Deterministic comparisons that expose changed splits, preprocessing, model,
+  training budgets, evaluation definitions and units.
 
-PDF / GitHub → source chunks in SQLite → consent → Skill-guided plan → MCP tool loop
-→ structured synthesis → citation validation → Markdown.
+Version 0.2.0 supports a personal workspace. An agent or researcher still selects
+the target, prepares an image and writes a metric adapter. This is not universal
+one-click paper reproduction. A successful run is separate from metric agreement.
 
-One agent, five LangGraph nodes. SQLite checkpoints persist consent interrupts;
-an append-only event table makes planning and tool execution inspectable. Jobs
-interrupted by a service restart are marked failed explicitly; pending consent
-can be resumed after restart. There is no fabricated success fallback.
+## Agent-first quick start
 
-- **PDF:** pypdf + LangChain chunking; physical page metadata; no OCR.
-- **Repositories:** public GitHub API and an official commit-pinned codeload archive;
-  up to 24 selected files, first 100 KB per file, 2 MB indexed text, 20 MB compressed
-  archive. Root manifests and core source come first. Source scripts are never executed.
-- **RAG:** character 2–4 gram sparse hashing vectors and cosine similarity on CPU.
-  This is lexical vector retrieval, not semantic embeddings or cross-lingual search.
-- **MCP:** official Python SDK **2.3.0**, `MCPServer` / `Client`, real stdio transport.
-  Tools: `source_overview`, `paper_search`, `code_search`.
-- **Skills:** two standard SKILL.md files, loaded into planning and synthesis;
-  allowed tools constrain the plan. Tests exercise observable routing and prompts.
-- **LLM:** LangChain `ChatOpenAI`; Pydantic-validated JSON plans and cited claims.
-- **UI:** Chinese Streamlit interface, live task status, event log, raw evidence and
-  Markdown download; FastAPI serves the backend.
-
-Citation validation checks source ID existence. It cannot prove entailment or
-eliminate hallucinations. Analysis is not a claim of successful code reproduction.
-
-![Actual server container, live model analysis](docs/screenshots/server-live.jpg)
-
-## Quick start
-
-Use Python **3.12+**; the exact NumPy/SciPy lock requires 3.12.
+Use Python 3.12+ in a virtual environment:
 
 ```bash
-python -m venv .venv
-# Activate .venv using the command for your operating system.
 python -m pip install -r requirements.lock
-python -m pip install -e '.[dev]'
-# Copy .env.example to .env; mock mode needs no API key.
-python -m uvicorn paperpilot.api:create_app --factory --host 127.0.0.1 --port 8000
+python -m pip install -e .
+paperpilot init --pdf paper.pdf --repo https://github.com/owner/repo --title "Target experiment"
+paperpilot evidence --study STUDY_ID --query "method dataset split train evaluation"
+paperpilot schema recipe
 ```
 
-In another terminal, from the repository root:
+Load `agent-skills/paperpilot-reproduce/SKILL.md` in your agent. The evidence CLI
+needs neither the web service nor an additional model key. Use `--commit SHA` to
+import an exact code version. The CLI invokes actual MCP stdio tools.
+
+Prepare a local Docker image, recipe and adapter, then review before execution:
 
 ```bash
-python -m streamlit run paperpilot/ui.py --server.address 127.0.0.1 --server.headless true --browser.gatherUsageStats false
+paperpilot inspect recipe.json
+paperpilot run recipe.json --approve APPROVAL_DIGEST
+paperpilot compare data/runs/RUN_ID/comparison-input.json --output data/comparison.md
+paperpilot record data/runs/RUN_ID/comparison-input.json --study STUDY_ID
 ```
 
-Visit `http://localhost:8501`; API docs are at `http://localhost:8000/docs`.
-Use a single API worker. The queue admits eight jobs, with two concurrent executions.
-The app itself needs no GPU. Local model resources depend on the selected model.
+The approval digest binds the recipe, adapter hash and local image ID. The runner
+downloads a pinned public snapshot, mounts code read-only, and runs without network,
+GPU, host credentials or a Docker socket. See the runnable
+[TCN Adding Problem case](examples/tcn-adding/README.md) and [workflow](docs/reproduction.md).
 
-## Models and credentials
+## Web workspace
 
-Run `python scripts/configure_model.py` to save credentials privately without
-invoking a model, or set these environment variables:
+```bash
+docker compose up -d --build --wait
+```
+
+Open `http://localhost:8501`; API docs: `http://localhost:8000/docs`. Import the paper
+and repository, link a study, request a joint explanation or reproduction plan,
+then upload `comparison-input.json` after a separately approved host-side run.
+The web containers do not receive Docker privileges.
+
+Mock mode is the default: real ingestion, retrieval and MCP calls, with labeled
+extractive previews. For model-based joint explanations configure `.env`:
 
 ```dotenv
 PAPERPILOT_MODE=live
 OPENAI_BASE_URL=https://your-compatible-provider/v1
-OPENAI_MODEL=your-model-id
-OPENAI_API_KEY=your-secret
+OPENAI_MODEL=your-model
+OPENAI_API_KEY=your-private-key
 ```
 
-For an existing local Ollama service, use `http://localhost:11434/v1` and `ollama`
-as the key. Model output must follow JSON instructions. Invalid JSON and connection
-errors fail visibly. Invalid citations receive at most one model correction;
-a second rejection fails the task. Normal tasks use two model calls, or at most
-three with correction. Network retries are disabled.
-Never commit `.env` or runtime databases. The UI does not receive the model key.
+Each Live task pauses before sending data. Model errors fail visibly. Citation
+errors receive at most one correction. Never commit credentials or runtime data.
+See [deployment](docs/deployment.md) for native Windows/Linux startup, provider
+options and SSH forwarding. Ollama-compatible configuration is available; no
+specific local Ollama model has been validated.
 
-## Tests and repeatable examples
+## Contracts and limits
+
+Paper and code evidence retain their origin; every method mapping must cite both.
+Result comparison checks the declared dataset, split, preprocessing, model,
+training budget, evaluation, metric unit and tolerance. Smoke runs, unknown
+conditions and unreviewed baselines cannot be labeled directly comparable. A better
+metric outside tolerance is still a discrepancy. Uploaded measurements are labeled
+external; hashes and logs do not prove that a submitted protocol is truthful.
+
+Retrieval uses character 2–4 gram sparse hashing and cosine similarity on CPU,
+not semantic embeddings. The source index samples up to 24 repository files,
+100 KB each and 2 MB total. Text PDFs only; no OCR or visual table interpretation.
+The reviewed runner supports Linux CPU containers, up to 30 minutes, 4 CPUs and
+8 GB RAM per run. Dependencies must be installed in a prebuilt image.
+It is not a hardened service for hostile code.
+
+One LangGraph agent handles five substantive nodes; SQLite stores sources, events,
+results and checkpoints. MCP uses official Python SDK 2.3.0. No multi-tenant auth,
+general web search, automatic code repair or GPU runner is implemented.
+
+## Development
 
 ```bash
-python scripts/make_example.py
+python -m pip install -e '.[dev]'
 python -m pytest -q
 ruff check .
-# Against a running API, with real public GitHub access:
-python scripts/smoke.py
 ```
 
-The included PDF is an original, explicitly synthetic educational fixture under
-MIT. It is not a published scientific study. Its second page states Adam with
-learning rate 0.001. See [expected evidence](examples/expected.md).
-Offline tests cover ingestion, retrieval, real MCP calls, graph execution,
-consent persistence, rejected citations and tool restrictions. Model test doubles
-verify contracts only; they are not real-model acceptance evidence.
+Tests exercise real MCP, joint citations, graph consent, protocol comparisons,
+approval digests, runner failures and API persistence. CI tests Windows/Linux on
+Python 3.12/3.13 and Docker service readiness. See [testing](docs/testing.md).
 
-## Deployment
-
-```bash
-docker compose up -d --build --wait
-docker compose logs -f
-docker compose down
-```
-
-Ports bind to loopback by default. SQLite data lives in a named volume. The image
-runs as a non-root user. A Linux deployment without Docker is supported by
-`deploy/install-user-service.sh /absolute/project /absolute/venv`.
-See [deployment notes](docs/deployment.md) for SSH access and provider setup.
-
-This instance shares all sources and history across its users. It has no multi-tenant
-authentication or permission isolation; use a private SSH tunnel for the current
-personal-workspace deployment. No repository code execution or general web search
-is implemented. See [testing](docs/testing.md) for offline checks and optional
-end-to-end verification against your configured service.
-
-## Project map
-
-`paperpilot/` contains the application and bundled Skills; `tests/` covers core
-behavior; `scripts/` provides runnable examples; `deploy/` contains user-service
-deployment; `docs/` documents architecture, deployment, testing and example reports.
-
-Primary references: [LangGraph](https://docs.langchain.com/oss/python/langgraph/graph-api),
-[MCP v2](https://py.sdk.modelcontextprotocol.io/client/),
-[Agent Skills](https://agentskills.io/specification),
-[LangChain ChatOpenAI](https://docs.langchain.com/oss/python/integrations/chat/openai).
-
-MIT License. Imported documents and inspected repositories retain their original
-rights and licenses; they are not relicensed or bundled by this project.
+MIT License. Imported documents, repositories and data retain their original licenses.

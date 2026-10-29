@@ -52,15 +52,17 @@ def parse_github_url(url: str) -> tuple[str, str]:
     return owner, repo.removesuffix(".git")
 
 
-async def ingest_github(url: str, store: Store, client: httpx.AsyncClient) -> dict:
+async def ingest_github(url: str, store: Store, client: httpx.AsyncClient, commit: str | None = None) -> dict:
     owner, repo = parse_github_url(url)
+    if commit is not None and not re.fullmatch(r"[a-f0-9]{40}", commit):
+        raise ValueError("commit 必须是完整的 40 位小写 SHA")
     api = f"https://api.github.com/repos/{owner}/{repo}"
     response = await client.get(api)
     response.raise_for_status()
     info = response.json()
     if info["private"]:
         raise ValueError("仅分析公开仓库")
-    response = await client.get(f"{api}/commits/{quote(info['default_branch'], safe='')}")
+    response = await client.get(f"{api}/commits/{commit or quote(info['default_branch'], safe='')}")
     response.raise_for_status()
     commit = response.json()["sha"]
     response = await client.get(f"{api}/git/trees/{commit}", params={"recursive": "1"})

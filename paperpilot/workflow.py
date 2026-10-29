@@ -18,13 +18,14 @@ from paperpilot.store import Store
 
 
 class Action(BaseModel):
-    tool: Literal["source_overview", "paper_search", "code_search"]
+    tool: Literal["source_overview", "paper_search", "code_search", "study_search", "study_results"]
     query: str = Field(default="", max_length=1500)
     purpose: str = Field(min_length=1, max_length=500)
+    path: str | None = Field(default=None, max_length=300)
 
 
 class Plan(BaseModel):
-    actions: list[Action] = Field(min_length=2, max_length=5)
+    actions: list[Action] = Field(min_length=2, max_length=6)
 
 
 class Claim(BaseModel):
@@ -41,6 +42,30 @@ class Report(BaseModel):
     title: str
     sections: list[Section] = Field(min_length=1, max_length=8)
     gaps: list[str] = Field(default_factory=list, max_length=12)
+
+
+class MethodMapping(BaseModel):
+    concept: str = Field(max_length=300)
+    explanation: str = Field(max_length=1200)
+    paper_source_ids: list[str] = Field(min_length=1, max_length=3)
+    code_source_ids: list[str] = Field(min_length=1, max_length=3)
+
+
+class ExperimentTarget(BaseModel):
+    experiment: str = Field(max_length=300)
+    dataset_and_split: str = Field(max_length=600)
+    metric: str = Field(max_length=200)
+    paper_value: float | None = Field(default=None, allow_inf_nan=False)
+    unit: str = Field(max_length=100)
+    paper_location: str = Field(max_length=300)
+    command: list[str] = Field(max_length=30)
+    missing_requirements: list[str] = Field(max_length=10)
+    source_ids: list[str] = Field(min_length=1, max_length=5)
+
+
+class StudyReport(Report):
+    method_map: list[MethodMapping] = Field(min_length=1, max_length=5)
+    experiments: list[ExperimentTarget] = Field(min_length=1, max_length=4)
 
 
 class State(TypedDict, total=False):
@@ -70,9 +95,13 @@ def chat_model(settings: Settings) -> ChatOpenAI:
 async def model_json(model, schema: type[BaseModel], system: str, user: dict,
                      store: Store, job_id: str) -> BaseModel:
     wire_schema = schema.model_json_schema()
-    if schema is Report:
-        wire_schema["$defs"]["Claim"]["properties"]["source_ids"]["items"]["enum"] = [
-            item["id"] for item in user["evidence"]]
+    if issubclass(schema, Report):
+        for definition in wire_schema["$defs"].values():
+            for name, field in definition.get("properties", {}).items():
+                if name.endswith("source_ids"):
+                    kind = "paper" if name == "paper_source_ids" else "repository" if name == "code_source_ids" else None
+                    field["items"]["enum"] = [item["id"] for item in user["evidence"]
+                                               if kind is None or item.get("source_kind") == kind]
     response = await model.ainvoke([
         SystemMessage(content=system + "\nReturn ONLY JSON matching this schema:\n"
                       + json.dumps(wire_schema, ensure_ascii=False)),
@@ -102,7 +131,7 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
         skill = load_skill(source["kind"])
         store.event(state["job_id"], "skill_loaded", dict(name=skill.name, tools=skill.tools))
         if settings.mode == "mock":
-            tool = "paper_search" if source["kind"] == "paper" else "code_search"
+            tool = {"paper": "paper_search", "repository": "code_search", "study": "study_search"}[source["kind"]]
             actions = [
                 Action(tool="source_overview", purpose="检查来源范围与开篇证据"),
                 Action(tool=tool, query=state["question"], purpose="检索用户问题"),
@@ -110,19 +139,27 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
                        source["kind"] == "paper" else "dependencies install configuration main app run"),
                        purpose="补充方法与复现依据"),
             ]
+            if source["kind"] == "study" and store.results(source["id"]):
+                actions.append(Action(tool="study_results", purpose="读取真实导入的指标及协议对照"))
             proposal = Plan(actions=actions)
         else:
             proposal = await model_json(llm, Plan,
-                "You plan a read-only research task. Choose 2-5 real tool calls. "
+                "You plan a read-only research task. Choose 2-6 real tool calls. "
                 "Always include source_overview and a targeted search. No code execution.\n"
                 + skill.instructions + "\nAllowed tools: " + ", ".join(skill.tools),
-                dict(question=state["question"], kind=source["kind"], title=source["title"]),
+                dict(question=state["question"], kind=source["kind"], title=source["title"],
+                     inspected_files=(source["metadata"].get("repository", source["metadata"]).get("files", [])),
+                     objective=source["metadata"].get("objective", state["question"]),
+                     imported_results=len(store.results(source["id"])) if source["kind"] == "study" else 0),
                 store, state["job_id"])
         for action in proposal.actions:
-            if action.tool not in skill.tools or (action.tool != "source_overview" and not action.query.strip()):
+            if action.tool not in skill.tools or (action.tool not in {"source_overview", "study_results"}
+                                                  and not action.query.strip()):
                 raise ValueError("模型计划包含未授权工具或空检索词")
+            if action.path is not None and action.tool not in {"code_search", "study_search"}:
+                raise ValueError("文件路径过滤只适用于代码或联合检索")
         if not any(a.tool == "source_overview" for a in proposal.actions) or not any(
-                a.tool != "source_overview" for a in proposal.actions):
+                a.tool in {"paper_search", "code_search", "study_search"} for a in proposal.actions):
             raise ValueError("计划必须包含来源检查和检索")
         store.event(state["job_id"], "plan", proposal.model_dump())
         return dict(source=source, skill=dict(name=skill.name, instructions=skill.instructions),
@@ -132,8 +169,10 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
     async def execute(state: State) -> dict:
         action = state["actions"][state["cursor"]]
         args = dict(source_id=state["source_id"])
-        if action["tool"] != "source_overview":
+        if action["tool"] not in {"source_overview", "study_results"}:
             args["query"] = action["query"]
+        if action.get("path") is not None:
+            args["path"] = action["path"]
         store.event(state["job_id"], "tool_started", dict(tool=action["tool"], arguments=args))
         # Only configuration needed by tools is passed to the child process, never model credentials.
         environment = {k: v for k, v in os.environ.items()
@@ -173,7 +212,7 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
             )], gaps=["Mock 模式没有调用大语言模型，不提供创新性判断、复现结论或语义推理。",
                       "稀疏字符向量检索不具备跨语言语义理解；可使用中英双语关键词。"])
         else:
-            report = await model_json(llm, Report,
+            report = await model_json(llm, StudyReport if state["source"]["kind"] == "study" else Report,
                 "You are PaperPilot. Write a useful structured research report in Chinese. "
                 "Every claim must cite exact evidence.id values from the schema enum, such as S1. "
                 "Source database IDs and chunk IDs are NOT citation IDs. "
@@ -193,8 +232,14 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
         # Report JSON was validated at the model boundary; audit only source membership here.
         report = state["report"]
         evidence = {e["id"]: e for e in state["evidence"]}
-        invalid = sorted({ref for section in report["sections"] for claim in section["claims"]
-                          for ref in claim["source_ids"] if ref not in evidence})
+        cited = [(ref, None) for section in report["sections"] for claim in section["claims"]
+                 for ref in claim["source_ids"]]
+        cited += [(ref, kind) for mapping in report.get("method_map", [])
+                  for field, kind in [("paper_source_ids", "paper"), ("code_source_ids", "repository")]
+                  for ref in mapping[field]]
+        cited += [(ref, None) for target in report.get("experiments", []) for ref in target["source_ids"]]
+        invalid = sorted({ref for ref, kind in cited if ref not in evidence
+                          or (kind and evidence[ref].get("source_kind") != kind)})
         if invalid:
             store.event(state["job_id"], "citation_rejected", dict(invalid=invalid,
                         repair_attempt=state["report_retries"]))
@@ -211,6 +256,20 @@ def build_graph(settings: Settings, store: Store, checkpointer, model=None):
             lines.extend([f"## {section['heading']}", ""])
             for claim in section["claims"]:
                 lines.extend([claim["text"] + " " + " ".join(f"[{ref}]" for ref in claim["source_ids"]), ""])
+        if report.get("method_map"):
+            lines.extend(["## 论文方法 → 代码实现", ""])
+            for item in report["method_map"]:
+                refs = item["paper_source_ids"] + item["code_source_ids"]
+                lines.extend([f"### {item['concept']}", "", item["explanation"] + " " +
+                              " ".join(f"[{r}]" for r in refs), ""])
+        if report.get("experiments"):
+            lines.extend(["## 实验目标与运行草案", "", "> 以下命令尚未执行；需核对环境与数据后单独批准。", ""])
+            for target in report["experiments"]:
+                lines.extend([f"### {target['experiment']}", "", f"数据与划分：{target['dataset_and_split']}", "",
+                    f"论文指标：{target['metric']} = {target['paper_value']} {target['unit']}；{target['paper_location']}",
+                    "", "```json", json.dumps(target["command"], ensure_ascii=False), "```", "",
+                    "缺失条件：" + "；".join(target["missing_requirements"]), "",
+                    " ".join(f"[{r}]" for r in target["source_ids"]), ""])
         lines.extend(["## 缺失信息与边界", ""])
         lines.extend(f"- {gap}" for gap in report["gaps"])
         lines.extend(f"- 工具失败：{error}" for error in state["errors"])

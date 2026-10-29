@@ -21,6 +21,8 @@ class Store:
                 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,
                     job_id TEXT NOT NULL, payload TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS results(id TEXT PRIMARY KEY, study_id TEXT NOT NULL,
+                    payload TEXT NOT NULL);
             """)
 
     def connect(self) -> sqlite3.Connection:
@@ -48,6 +50,31 @@ class Store:
         with self.connect() as db:
             rows = db.execute("SELECT payload FROM chunks WHERE source_id=? ORDER BY rowid",
                               (source_id,)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def sources(self) -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute("SELECT payload FROM sources ORDER BY rowid DESC LIMIT 100").fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def add_study(self, paper_id: str, repository_id: str, title: str, objective: str) -> dict:
+        paper, repository = self.source(paper_id), self.source(repository_id)
+        if paper["kind"] != "paper" or repository["kind"] != "repository":
+            raise ValueError("复现工作区需要一篇论文和一个代码仓库")
+        return self.add_source("study", title, dict(paper_id=paper_id, repository_id=repository_id,
+            objective=objective, paper=paper["metadata"], repository=repository["metadata"]), [])
+
+    def save_result(self, study_id: str, payload: dict) -> dict:
+        result = dict(id=uuid4().hex, study_id=study_id, created_at=datetime.now(UTC).isoformat(), **payload)
+        with self.connect() as db:
+            db.execute("INSERT INTO results VALUES (?,?,?)",
+                       (result["id"], study_id, json.dumps(result, ensure_ascii=False)))
+        return result
+
+    def results(self, study_id: str) -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute("SELECT payload FROM results WHERE study_id=? ORDER BY rowid DESC",
+                              (study_id,)).fetchall()
         return [json.loads(row[0]) for row in rows]
 
     def save_job(self, job: dict) -> None:

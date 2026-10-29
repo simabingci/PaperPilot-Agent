@@ -16,10 +16,17 @@ ruff check .
 - PDF 解析、物理页码、分块与检索。
 - GitHub 地址校验、固定 commit、文件采样和截断边界。
 - MCP 进程内调用和真实 stdio 客户端通信。
-- 两类 Skill 加载、提示注入及工具约束。
+- 三类内置 Skill 加载、提示使用及工具约束。
+- 联合检索同时包含论文和代码；文件过滤不丢弃论文证据。
+- 方法映射必须同时引用论文与代码，调换来源类型会被拒绝。
 - LangGraph 多步工具执行、确认拒绝和 checkpoint 恢复。
 - 非法引用的一次纠正与最终拒绝、模型错误直接失败。
 - FastAPI 来源导入、任务状态与 Markdown 下载。
+- 实验协议、单位、缺失指标、未知条件、smoke 与容差比较。
+- 配方批准摘要绑定适配器、镜像及预算；变化后旧摘要不可执行。
+- Runner 下载失败、超时、缺失指标时保留失败记录，不生成成功对照。
+- 结果导入绑定工作区 commit，持久化并由 API 重新计算对照。
+- 本地 CLI 记录结果不依赖 Web/模型；已导入指标通过 MCP 进入图的可引用证据。
 
 模型替身验证工作流契约，不代表真实模型的分析质量。CI 在 Windows、Linux
 及 Python 3.12、3.13 上执行测试，并构建、启动 Docker 服务检查健康状态。
@@ -67,3 +74,21 @@ docker compose down
 
 停止容器默认保留命名数据卷。完整端到端验证还需执行上述浏览器步骤；健康检查
 本身只能证明服务已就绪。项目尚无高并发容量或检索质量基准。
+
+## 联合工作区与实际实验
+
+使用 [TCN 案例](../examples/tcn-adding/README.md) 验证真实论文、作者代码和
+实际数值。案例运行与离线 pytest 分开，需 Docker 镜像和一次具体执行批准。
+原始结果保存在案例的 results/，完整训练未执行。
+
+Web 中将两种材料关联为工作区，确认模型数据传输，检查联合报告包含方法映射
+和目标实验；对每条映射核对 PDF 页码和代码行号。再上传案例的
+`comparison-input.json`，确认 commit 匹配且显示“不可直接比较”，原因包含
+split、training_budget 和 smoke 范围。下载报告后与原始 metrics.json 对照。
+
+可运行 `paperpilot evidence --study ID --query "Adding Prob. 600 loss Table 4"`
+验证已有 Agent 的无额外模型 API 路径；返回应同时有 paper 和 repository 证据。
+文件定向检索可加 `--code-path TCN/adding_problem/add_test.py`。
+
+测试替身覆盖失败分支；真实 TCN CPU 运行验证成功生命周期。不能把其中任意一项
+单独当作任意恶意代码隔离、所有论文可复现或模型结论正确的证明。
