@@ -1,0 +1,42 @@
+services:
+  api:
+    build: .
+    image: paperpilot-agent:local
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PAPERPILOT_MODE: ${PAPERPILOT_MODE:-mock}
+      PAPERPILOT_DATA_DIR: /app/data
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - paperpilot-data:/app/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  web:
+    image: paperpilot-agent:local
+    command: ["python", "-m", "streamlit", "run", "paperpilot/ui.py", "--server.address=0.0.0.0", "--server.headless=true", "--browser.gatherUsageStats=false"]
+    environment:
+      PAPERPILOT_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8501:8501"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+volumes:
+  paperpilot-data:
