@@ -53,6 +53,9 @@ downloads a pinned public snapshot, mounts code read-only, and runs without netw
 GPU, host credentials or a Docker socket. See the runnable
 [TCN Adding Problem case](examples/tcn-adding/README.md) and [workflow](docs/reproduction.md).
 
+See the actual [joint analysis report](docs/examples/tcn-study-report.md) and
+[result workspace screenshot](docs/screenshots/reproduction-results.jpg).
+
 ## Web workspace
 
 ```bash

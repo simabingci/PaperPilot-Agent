@@ -45,6 +45,11 @@ paperpilot compare data/runs/RUN_ID/comparison-input.json --output data/tcn-comp
 **0.2443082481622696**，论文 Table 4 为 **0.000058**。
 由于训练预算和划分未对齐，对照状态为不可直接比较。该数值不作为性能或复现成功声明。
 
+[真实联合模型报告](../../docs/examples/tcn-study-report.md)引用了论文表格、代码及
+本次导入结果，实际调用 6 次 MCP 工具、收集 39 条证据。报告保留原始模型输出，
+其中命令仍是未执行草案，存在整条命令放在一个数组元素中的格式问题，不能直接
+交给 Runner。运行本案例请使用上面已测试的 recipe.json 和 adapter.py。
+
 ## 联合讲解
 
 下载论文到本地运行目录后，可以用 CLI 或 Web 关联同一仓库版本：

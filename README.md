@@ -56,6 +56,12 @@ paperpilot record data/runs/RUN_ID/comparison-input.json --study STUDY_ID
 
 完整可运行案例见 [TCN Adding Problem](examples/tcn-adding/README.md)。
 
+[真实联合报告](docs/examples/tcn-study-report.md)保留模型对论文、代码和导入结果的原始分析。
+
+![真实 CPU 运行结果与论文基准对照](docs/screenshots/reproduction-results.jpg)
+
+[查看联合分析完成页面](docs/screenshots/joint-study.jpg)。截图来自实际部署页面，未修改显示值。
+
 ### Web：联合研究与结果工作台
 
 ```bash
