@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 from argparse import Namespace
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from mcp import Client
@@ -37,6 +38,15 @@ def test_original_page_retention_render_and_full_text_export(store, pdf_bytes, t
     assert not old["original_available"] and old["text"] is None and old["chunks"]
     with pytest.raises(ValueError, match="原 PDF"):
         export_text(store, paper["id"], exported)
+
+
+def test_two_reader_tabs_can_render_without_simultaneous_pdfium_calls(store, pdf_bytes):
+    paper = ingest_pdf(pdf_bytes, "fixture.pdf", store)
+    path = pdf_path(store, paper)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda number: render_page(path, number), [1, 2, 1, 2]))
+    assert all(image.startswith(b"\x89PNG\r\n\x1a\n") for image in results)
+    assert results[0] == results[2] and results[1] == results[3]
 
 
 async def test_one_command_start_expanded_evidence_and_mcp_resume(store, pdf_bytes, tmp_path):

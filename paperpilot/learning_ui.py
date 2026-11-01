@@ -11,6 +11,7 @@ from paperpilot.reader import paper_source, pdf_path, read_page, render_page
 from paperpilot.store import Store
 
 st.set_page_config(page_title="PaperPilot · 阅读", page_icon="📖", layout="wide")
+st.set_option("client.toolbarMode", "minimal")
 st.markdown("""<style>
 .stApp {background:#fff;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .block-container {max-width:1380px;padding-top:2.5rem;}

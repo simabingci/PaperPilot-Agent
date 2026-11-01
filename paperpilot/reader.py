@@ -3,11 +3,14 @@
 import io
 from contextlib import closing
 from pathlib import Path
+from threading import Lock
 
 import pypdfium2 as pdfium
 from pypdf import PdfReader
 
 from paperpilot.store import Store
+
+_PDFIUM_LOCK = Lock()  # PDFium forbids simultaneous calls, including different documents.
 
 
 def paper_source(store: Store, source_id: str) -> dict:
@@ -38,7 +41,7 @@ def read_page(store: Store, source_id: str, page: int) -> dict:
 
 
 def render_page(path: Path, page: int) -> bytes:
-    with pdfium.PdfDocument(path) as document:
+    with _PDFIUM_LOCK, pdfium.PdfDocument(path) as document:
         if not 1 <= page <= len(document):
             raise ValueError("该页超出 PDF 的物理页码范围")
         with closing(document[page - 1]) as original:

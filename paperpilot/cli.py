@@ -194,7 +194,9 @@ def main() -> None:
             os.environ["PAPERPILOT_DATA_DIR"] = str(args.data_dir.resolve())
         raise SystemExit(subprocess.call([sys.executable, "-m", "streamlit", "run",
             str(Path(__file__).with_name("learning_ui.py")), "--server.address=127.0.0.1",
-            f"--server.port={args.port}", "--server.headless=true", "--browser.gatherUsageStats=false"]))
+            f"--server.port={args.port}", "--server.headless=true", "--browser.gatherUsageStats=false",
+            "--theme.base=light", "--theme.primaryColor=#0071e3", "--theme.backgroundColor=#ffffff",
+            "--theme.secondaryBackgroundColor=#f5f5f7", "--theme.textColor=#1d1d1f"]))
     try:
         result = asyncio.run(main_async(args))
         print(json.dumps(result, ensure_ascii=False, indent=2))
