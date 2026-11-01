@@ -15,3 +15,6 @@ build/
 *.log
 .coverage
 htmlcov/
+
+# Generated local skill installation (contains machine-specific runtime paths)
+.agents/skills/paperpilot-study/

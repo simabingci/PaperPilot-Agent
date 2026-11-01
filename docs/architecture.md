@@ -10,14 +10,15 @@ PaperPilot 将联合证据、Agent 推理、实验执行和指标比较分开。
 `Store.add_study` 关联一篇 paper 和一个 repository，冻结这两个来源的元数据、
 PDF 哈希与 commit；不会把两种来源混成失去定位信息的一段文本。
 
-SQLite 包含 sources、chunks、jobs、events 和 results；新增 results 表可直接在
+SQLite 包含 sources、chunks、jobs、events、results 和 learning；新增表可直接在
 原数据库上创建，已有来源和任务保留。LangGraph 使用独立的 SQLite checkpoint。
-上传 PDF 二进制不由应用持久化，提取文本和元数据会保留。
+原 PDF 按 SHA-256 保存在本地数据目录的 pdf/ 下，供原页渲染；文本与元数据保存在 SQLite。
+旧记录若未保留原件，会明确提示关联同一哈希的 PDF，不伪造原页。
 
 ## 联合检索与报告
 
 MCP stdio 工具有 `source_overview`、`paper_search`、`code_search`、`study_search`、
-`list_sources`、`study_results`。`study_search` 分别在论文与代码中取最多 5 个词面
+`list_sources`、`study_results`、`paper_page`、`learning_context`。`study_search` 分别在论文与代码中取最多 5 个词面
 匹配分块，返回 `source_kind` 和原定位信息。CLI evidence 和 Web 都实际调用 MCP。
 
 检索采用字符 2–4 gram 的 HashingVectorizer、2^18 特征和 L2 归一化，按余弦
@@ -85,3 +86,16 @@ CPU、内存、进程数和日志限制。镜像不自动构建或拉取。
 可恢复；服务重启时执行中的分析任务标为失败。主机 Runner 需单独管理，当前不
 实现 Web 调度、GPU 调度、自动修复或断点训练。单实例来源和历史共享，应使用
 私有 SSH 隧道，当前无多租户权限隔离。
+
+
+## 本地学习与原文阅读
+
+0.3.0 的主学习流程由调用方 Agent 推理，CLI/MCP 提供证据和持久化，不再调用一套模型。
+learning.py 保存单概念讲解、实际回答、反馈及显式跳过；context 从同名概念最近反馈
+生成待复习列表，并返回等待回答/等待反馈/可继续状态，不将记录数量当作掌握率。
+reader.py 读取原物理页、导出按页标记的全文，并用本地 PDFium 渲染 PNG，公式和图表
+不依赖纯文字恢复。CLI evidence 同时返回前3个不同命中页的完整原文，补足片段边界；
+主 LangGraph 报告流程仍使用原有片段证据，不宣称这次增加了图像模型或 OCR。
+learning_ui.py 在“原文与讲解 / 完整笔记 / 实验结果”间切换，不持有模型或 Docker 权限。
+技能安装器写入本机 Python 命令和数据目录，避免换目录或未激活 venv 后找不到 CLI。
+多用户应各自安装；当前不合并对同一学习记录的并发编辑，不提供权限隔离服务。

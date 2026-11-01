@@ -1,0 +1,330 @@
+{
+  "cases_sha256": "0fd9e4405b4ba36f00df86c29eb53aa1d89fcf832b9f2bdc5d062a01bc7049c0",
+  "papers": {
+    "attention": {
+      "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+      "pages": 15
+    },
+    "steg": {
+      "sha256": "dcfe6ccf8f699ea78d8aea5d27721287656c8b77342c0ba8cfe12088892bb2ba",
+      "pages": 8
+    },
+    "tcn": {
+      "sha256": "f7e5df08b234f1c395ff4f7b3597b28f170fc9d70af388be5b645bfc4456f42b",
+      "pages": 14
+    }
+  },
+  "case_count": 15,
+  "hit_at_5": 0.8666666666666667,
+  "mrr_at_5": 0.7222222222222222,
+  "full_page_checks": 15,
+  "renders": {
+    "attention": {
+      "page": 4,
+      "bytes": 320818,
+      "png": true
+    },
+    "steg": {
+      "page": 2,
+      "bytes": 696947,
+      "png": true
+    },
+    "tcn": {
+      "page": 3,
+      "bytes": 666654,
+      "png": true
+    }
+  },
+  "cases": [
+    {
+      "id": "attn-scale",
+      "paper": "attention",
+      "query": "Scaled Dot-Product Attention divide sqrt softmax",
+      "retrieved_pages": [
+        4,
+        4,
+        2,
+        5,
+        7
+      ],
+      "expected_pages": [
+        4
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 83.998
+    },
+    {
+      "id": "attn-heads",
+      "paper": "attention",
+      "query": "multi-head h=8 dk dv 64 parallel heads",
+      "retrieved_pages": [
+        5,
+        4,
+        4,
+        4,
+        9
+      ],
+      "expected_pages": [
+        5
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 53.092
+    },
+    {
+      "id": "attn-position",
+      "paper": "attention",
+      "query": "位置编码 positional encoding sin cos sequence order",
+      "retrieved_pages": [
+        6,
+        6,
+        2,
+        2,
+        5
+      ],
+      "expected_pages": [
+        6
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 52.609
+    },
+    {
+      "id": "attn-warmup",
+      "paper": "attention",
+      "query": "学习率 warmup_steps 4000 learning rate schedule",
+      "retrieved_pages": [
+        7,
+        11,
+        7,
+        8,
+        11
+      ],
+      "expected_pages": [
+        7
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 52.868
+    },
+    {
+      "id": "attn-bleu",
+      "paper": "attention",
+      "query": "Table 2 Transformer base big BLEU 27.3 28.4",
+      "retrieved_pages": [
+        8,
+        8,
+        1,
+        9,
+        10
+      ],
+      "expected_pages": [
+        8
+      ],
+      "first_relevant_rank": 2,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 53.063
+    },
+    {
+      "id": "tcn-causal",
+      "paper": "tcn",
+      "query": "因果卷积 causal future past leakage",
+      "retrieved_pages": [
+        3,
+        3,
+        3,
+        1,
+        1
+      ],
+      "expected_pages": [
+        3
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 87.881
+    },
+    {
+      "id": "tcn-dilation",
+      "paper": "tcn",
+      "query": "dilated convolutions receptive field dilation factor",
+      "retrieved_pages": [
+        4,
+        3,
+        4,
+        4,
+        4
+      ],
+      "expected_pages": [
+        3
+      ],
+      "first_relevant_rank": 2,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 87.245
+    },
+    {
+      "id": "tcn-residual",
+      "paper": "tcn",
+      "query": "Figure 1 residual block WeightNorm Dropout convolution",
+      "retrieved_pages": [
+        4,
+        4,
+        8,
+        4,
+        8
+      ],
+      "expected_pages": [
+        4
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 86.041
+    },
+    {
+      "id": "tcn-settings",
+      "paper": "tcn",
+      "query": "Table 2 Adding Problem T=600 hidden channels kernel",
+      "retrieved_pages": [
+        12,
+        5,
+        11,
+        5,
+        7
+      ],
+      "expected_pages": [
+        12
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 86.904
+    },
+    {
+      "id": "tcn-metric",
+      "paper": "tcn",
+      "query": "Table 4 Adding Prob 600 loss TCN 5.8e-5",
+      "retrieved_pages": [
+        14,
+        7,
+        13,
+        12,
+        4
+      ],
+      "expected_pages": [
+        13
+      ],
+      "first_relevant_rank": 3,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 88.341
+    },
+    {
+      "id": "steg-pipeline",
+      "paper": "steg",
+      "query": "overall framework consists of two steps divergence expansion classifier",
+      "retrieved_pages": [
+        3,
+        2,
+        7,
+        7,
+        1
+      ],
+      "expected_pages": [
+        2
+      ],
+      "first_relevant_rank": 2,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 65.038
+    },
+    {
+      "id": "steg-ddim",
+      "paper": "steg",
+      "query": "DDIM forward step image to noise representation",
+      "retrieved_pages": [
+        3,
+        7,
+        2,
+        1,
+        2
+      ],
+      "expected_pages": [
+        3
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 64.57
+    },
+    {
+      "id": "steg-mlp",
+      "paper": "steg",
+      "query": "分类器 two-layer MLP flattened linear LeakyReLU sigmoid",
+      "retrieved_pages": [
+        4,
+        1,
+        5,
+        2,
+        2
+      ],
+      "expected_pages": [
+        4
+      ],
+      "first_relevant_rank": null,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 62.867
+    },
+    {
+      "id": "steg-settings",
+      "paper": "steg",
+      "query": "Experimental Settings 49 DDIM steps Adam learning rate",
+      "retrieved_pages": [
+        5,
+        2,
+        1,
+        7,
+        1
+      ],
+      "expected_pages": [
+        5
+      ],
+      "first_relevant_rank": 1,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 64.384
+    },
+    {
+      "id": "steg-result",
+      "paper": "steg",
+      "query": "Table 2 BOSSBase S-UNIWARD 0.2 bpp Ours 92.81",
+      "retrieved_pages": [
+        6,
+        6,
+        5,
+        7,
+        5
+      ],
+      "expected_pages": [
+        5
+      ],
+      "first_relevant_rank": null,
+      "page_verified": true,
+      "expanded_hit": true,
+      "retrieval_ms": 64.412
+    }
+  ],
+  "expanded_hit_at_3_pages": 1.0,
+  "limitation": "Checks targeted evidence containment and page rendering; not answer correctness, cross-language semantics, representative retrieval quality or learner improvement.",
+  "measured_at": "2026-11-01",
+  "evaluation_scope": "Development regression set of three known papers; no held-out papers, no generated-answer or learner-effect evaluation.",
+  "implementation": "Original character retrieval; expand the first three distinct retrieved physical pages."
+}

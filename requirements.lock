@@ -55,6 +55,7 @@ pydantic-settings==2.16.1
 pydeck==0.9.3
 pyjwt==2.15.1
 pypdf==6.21.3
+pypdfium2==5.14.0
 python-dateutil==3.0.0
 python-dotenv==1.2.4
 python-multipart==0.0.32

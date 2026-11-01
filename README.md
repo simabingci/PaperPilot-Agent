@@ -4,24 +4,63 @@
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
 
-**论文 × 代码 × 实验结果。** 为已有 Agent 和科研使用者提供可追溯的实验复现工作区。
-关联论文 PDF 与公开 GitHub 版本，讲解方法及代码对应关系，运行经过审阅的 CPU
-实验，并按实验协议对照实测指标与论文结果。
+**在已有 Agent 中读懂论文，连接方法、代码与实验。**
 
-## 可以用它做什么
+PaperPilot 为个人和课题组提供本地科研学习工作区。沿用已有 Agent 的推理能力，
+保存论文依据、逐轮讲解、真实回答与反馈；原文和笔记可以在同一个页面对照阅读。
+没有作者代码，也可以先学习方法并整理独立实现所需的条件。
 
-- **联合讲解**：论文方法对应哪个类、函数或配置；引用物理页码和固定 commit 的代码行号。
-- **复现准备**：提取目标表格、数据集、划分、训练与评估条件，列出未知项及命令草案。
-- **实验执行**：审阅配方后，用独立 Docker 容器运行公开代码，记录版本、日志、时间和实际指标。
-- **结果对照**：比较单位、实验协议和容差；小规模验证、协议不一致或基准未核实均明确标为不可直接比较。
-- **结果讲解**：将已导入的对照作为实验来源，联合说明实际数值、论文依据与协议差异。
-- **接入已有 Agent**：通过 [复现 Skill](agent-skills/paperpilot-reproduce/SKILL.md)、CLI 或 MCP 使用证据和实验工具，沿用已有 Agent 的模型。
+![原创教学材料的实际阅读页面](docs/screenshots/learning-reader.jpg)
 
-0.2.0 面向个人工作区。选实验、准备依赖和编写指标适配器由使用者或已有 Agent
-完成；Runner 自动处理固定快照下载、受限执行、日志与指标比较。它不保证任意论文
-一键复现，也不把脚本跑通当作论文指标达标。
+截图来自原创教学示例，不代表真实论文分析效果或学习测评结果。
 
-## 两种使用方式
+## 核心体验
+
+- **一起读**：一次解释一个概念，提出一个理解题，等待实际回答；可明确跳过。
+- **对照原文**：保留物理页码，直接渲染公式与图表；可导出按页标记的全文。
+- **继续学习**：恢复当前问题、回答、反馈与待复习概念，不伪造“已经掌握”。
+- **连接代码**：固定公开仓库版本，引用代码行号，区分作者实现和独立实现。
+- **核对实验**：受控执行已审阅的配方，记录真实指标，并按协议与论文结果比较。
+
+0.3.0 面向个人工作区，同门各自安装与保存数据，不提供共享账号或云端同步。
+学习流程无需额外模型 Key；调用方 Agent 自身的账户与用量仍按其服务计量。
+实验环境、指标适配器和未公开细节仍需使用者与 Agent 准备，不保证任意论文一键复现。
+
+## 安装（一次）
+
+Python 3.12+。在独立虚拟环境安装：
+
+```bash
+git clone https://github.com/simabingci/PaperPilot-Agent.git
+cd PaperPilot-Agent
+python -m venv .venv
+# 激活环境：Windows PowerShell 用 .\.venv\Scripts\Activate.ps1；macOS/Linux 用 source .venv/bin/activate
+python -m pip install -r requirements.lock
+python -m pip install -e .
+```
+
+也可以让已有 Agent 完成安装，再进入自己的科研项目目录安装下方 Skill。
+
+## 使用方式
+
+### 在已有 Agent 中学懂论文（有无源码均可）
+
+安装项目后，在自己的科研项目目录运行 `paperpilot skill-install`，将
+`paperpilot-study` 和当前 Python 运行信息安装到该目录的 `.agents/skills/`，在新的 Codex 会话中使用。
+无需再配置 PaperPilot 模型 Key。示例请求：
+
+> 使用 paperpilot-study 带我读这篇论文。一次只讲一个概念，结合原文解释，
+> 问一个理解题，等我回答后再继续；保存学习记录。这篇论文没有源码。
+
+```bash
+paperpilot --data-dir ./data learn start --pdf paper.pdf --goal "读懂方法与实验"
+paperpilot --data-dir ./data notebook
+```
+
+Agent 提供讲解和反馈，CLI 保存带原文摘录的概念、真实回答和反馈，网页用于回顾。
+学习目录由使用者单独管理；不是多人共享账户或云同步系统。没有作者实现时，先
+整理方法与缺失设置，再准备独立实现，不能把补充假设当作论文事实。
+详细命令与边界见 [论文学习](docs/learning.md)。
 
 ### 已有 Agent：Skill + CLI
 
@@ -122,7 +161,7 @@ Web 使用单个 LangGraph Agent，含确认、规划、MCP 工具循环、生�
 | 复现结论 | 协议按提交内容核对；引用存在或数值接近均不能单独证明完整复现 |
 | 部署 | 单用户共享工作区，无登录和租户隔离；端口默认仅绑定本机 |
 
-Web 容器不挂载 Docker socket。运行数据、上传原文和模型密钥不进入 Git。
+Web 容器不挂载 Docker socket。运行数据、学习笔记、上传原文和模型密钥不进入 Git。原 PDF 保存在本地数据目录，供原页阅读。
 Runner 适用于经过审阅的代码，不是面向恶意代码的托管沙箱服务。
 
 ## 开发

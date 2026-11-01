@@ -1,0 +1,191 @@
+{
+  "description": "Fixed retrieval/page-reading checks, not teaching or scientific answer-quality evaluation.",
+  "papers": {
+    "attention": {
+      "url": "https://arxiv.org/pdf/1706.03762v7"
+    },
+    "tcn": {
+      "url": "https://arxiv.org/pdf/1803.01271v2"
+    },
+    "steg": {
+      "doi": "10.3233/FAIA250841",
+      "note": "Supply a lawful local copy; no PDF is included."
+    }
+  },
+  "cases": [
+    {
+      "paper": "attention",
+      "id": "attn-scale",
+      "query": "Scaled Dot-Product Attention divide sqrt softmax",
+      "pages": [
+        4
+      ],
+      "contains": [
+        "softmax"
+      ]
+    },
+    {
+      "paper": "attention",
+      "id": "attn-heads",
+      "query": "multi-head h=8 dk dv 64 parallel heads",
+      "pages": [
+        5
+      ],
+      "contains": [
+        "8",
+        "64"
+      ]
+    },
+    {
+      "paper": "attention",
+      "id": "attn-position",
+      "query": "位置编码 positional encoding sin cos sequence order",
+      "pages": [
+        6
+      ],
+      "contains": [
+        "positional",
+        "sin"
+      ]
+    },
+    {
+      "paper": "attention",
+      "id": "attn-warmup",
+      "query": "学习率 warmup_steps 4000 learning rate schedule",
+      "pages": [
+        7
+      ],
+      "contains": [
+        "4000"
+      ]
+    },
+    {
+      "paper": "attention",
+      "id": "attn-bleu",
+      "query": "Table 2 Transformer base big BLEU 27.3 28.4",
+      "pages": [
+        8
+      ],
+      "contains": [
+        "27.3",
+        "28.4"
+      ]
+    },
+    {
+      "paper": "tcn",
+      "id": "tcn-causal",
+      "query": "因果卷积 causal future past leakage",
+      "pages": [
+        3
+      ],
+      "contains": [
+        "causal",
+        "future"
+      ]
+    },
+    {
+      "paper": "tcn",
+      "id": "tcn-dilation",
+      "query": "dilated convolutions receptive field dilation factor",
+      "pages": [
+        3
+      ],
+      "contains": [
+        "dilat"
+      ]
+    },
+    {
+      "paper": "tcn",
+      "id": "tcn-residual",
+      "query": "Figure 1 residual block WeightNorm Dropout convolution",
+      "pages": [
+        4
+      ],
+      "contains": [
+        "residual",
+        "dropout"
+      ]
+    },
+    {
+      "paper": "tcn",
+      "id": "tcn-settings",
+      "query": "Table 2 Adding Problem T=600 hidden channels kernel",
+      "pages": [
+        12
+      ],
+      "contains": [
+        "600",
+        "24"
+      ]
+    },
+    {
+      "paper": "tcn",
+      "id": "tcn-metric",
+      "query": "Table 4 Adding Prob 600 loss TCN 5.8e-5",
+      "pages": [
+        13
+      ],
+      "contains": [
+        "5.8e-5"
+      ]
+    },
+    {
+      "paper": "steg",
+      "id": "steg-pipeline",
+      "query": "overall framework consists of two steps divergence expansion classifier",
+      "pages": [
+        2
+      ],
+      "contains": [
+        "two steps"
+      ]
+    },
+    {
+      "paper": "steg",
+      "id": "steg-ddim",
+      "query": "DDIM forward step image to noise representation",
+      "pages": [
+        3
+      ],
+      "contains": [
+        "ddim",
+        "forward"
+      ]
+    },
+    {
+      "paper": "steg",
+      "id": "steg-mlp",
+      "query": "分类器 two-layer MLP flattened linear LeakyReLU sigmoid",
+      "pages": [
+        4
+      ],
+      "contains": [
+        "mlp",
+        "sigmoid"
+      ]
+    },
+    {
+      "paper": "steg",
+      "id": "steg-settings",
+      "query": "Experimental Settings 49 DDIM steps Adam learning rate",
+      "pages": [
+        5
+      ],
+      "contains": [
+        "49",
+        "adam"
+      ]
+    },
+    {
+      "paper": "steg",
+      "id": "steg-result",
+      "query": "Table 2 BOSSBase S-UNIWARD 0.2 bpp Ours 92.81",
+      "pages": [
+        5
+      ],
+      "contains": [
+        "92.81"
+      ]
+    }
+  ]
+}

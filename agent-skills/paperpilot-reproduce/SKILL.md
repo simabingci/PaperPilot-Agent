@@ -1,6 +1,6 @@
 ---
 name: paperpilot-reproduce
-description: Turn a paper and its public implementation into a source-linked explanation, a reviewed experiment recipe, and an actual-versus-paper result comparison using PaperPilot CLI or MCP. Use for experiment reproduction, method-to-code mapping, and diagnosing metric discrepancies.
+description: Turn a paper, optionally with a public implementation, into a source-linked explanation, a reviewed experiment recipe, and an actual-versus-paper result comparison using PaperPilot CLI or MCP. Use for experiment reproduction, method-to-code mapping, and diagnosing metric discrepancies.
 license: MIT
 metadata:
   requirements: Python 3.12+ with PaperPilot installed; Docker only for execution
@@ -10,7 +10,12 @@ Use the existing agent for reasoning. PaperPilot provides persistent joint evide
 fixed code versions, execution records and deterministic metric comparisons.
 No additional model API key is needed for this CLI workflow.
 
-1. Import the supplied paper and public code with `paperpilot init --pdf PAPER.pdf
+1. If the paper has no code, use `paperpilot init --pdf PAPER.pdf --title TITLE`
+   and `paperpilot evidence --source ID --query QUERY`. Explain the method first;
+   document missing settings and label any new code as an independent
+   implementation. Never create a fictitious author repository or code mapping.
+   For interactive teaching, install `paperpilot-study` with `paperpilot skill-install`.
+   Import supplied paper and public code with `paperpilot init --pdf PAPER.pdf
    --repo https://github.com/OWNER/REPO --title TITLE`. Add `--commit SHA` when a
    version is supplied. Keep the returned study ID and paper hash. Reuse an existing
    study from `paperpilot list` when it has the requested sources and version.

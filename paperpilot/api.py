@@ -63,7 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 task.cancel()
             await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-    app = FastAPI(title="PaperPilot Agent", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="PaperPilot Agent", version="0.3.0", lifespan=lifespan)
     app.state.store = store
 
     async def run(job_id: str, value) -> None:
@@ -117,7 +117,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     def health():
         return dict(status="ok", mode=config.mode, model=config.model if config.mode == "live" else None,
-                    retrieval="character-hashing sparse vectors", version="0.2.0")
+                    retrieval="character-hashing sparse vectors", version="0.3.0")
 
     @app.get("/sources")
     def sources():

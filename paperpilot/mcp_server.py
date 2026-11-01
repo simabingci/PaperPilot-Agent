@@ -7,6 +7,8 @@ from mcp.server import MCPServer
 from pydantic import Field
 
 from paperpilot.config import Settings
+from paperpilot.learning import context
+from paperpilot.reader import read_page
 from paperpilot.retrieval import search
 from paperpilot.store import Store
 
@@ -59,6 +61,16 @@ def create_server(store: Store) -> MCPServer:
             matches.extend(dict(c, source_kind=kind) for c in search(store, source["metadata"][key], query,
                                                                     path=path if kind == "repository" else None))
         return dict(matches=matches)
+
+    @server.tool(structured_output=True)
+    def paper_page(source_id: str, page: Annotated[int, Field(ge=1)]) -> dict[str, Any]:
+        """Read the full original physical page, not just ranked retrieval snippets."""
+        return read_page(store, source_id, page)
+
+    @server.tool(structured_output=True)
+    def learning_context(session_id: str) -> dict[str, Any]:
+        """Resume a lesson with its real answer, pending question and review queue."""
+        return context(store, session_id)
 
     @server.tool(structured_output=True)
     def list_sources() -> dict[str, Any]:

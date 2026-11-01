@@ -1,4 +1,4 @@
-"""SQLite documents, jobs and append-only task events; no pickle or raw PDF retention."""
+"""SQLite records; source PDFs are retained in the local data directory for reading."""
 
 import json
 import sqlite3
@@ -23,6 +23,7 @@ class Store:
                     job_id TEXT NOT NULL, payload TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS results(id TEXT PRIMARY KEY, study_id TEXT NOT NULL,
                     payload TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS learning(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
             """)
 
     def connect(self) -> sqlite3.Connection:

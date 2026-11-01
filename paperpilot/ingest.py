@@ -38,8 +38,12 @@ def ingest_pdf(data: bytes, filename: str, store: Store) -> dict:
         raise ValueError("PDF 没有可提取文字；扫描版需要先 OCR，当前版本不提供 OCR")
     if len(chunks) > 1800:
         raise ValueError("PDF 文本过长，当前限制 1800 个分块，请拆分文档")
+    digest = hashlib.sha256(data).hexdigest()
+    pdf_dir = store.path.parent / "pdf"
+    pdf_dir.mkdir(exist_ok=True)
+    (pdf_dir / f"{digest}.pdf").write_bytes(data)
     return store.add_source("paper", title or filename, dict(filename=filename, pages=len(reader.pages),
-                            sha256=hashlib.sha256(data).hexdigest(), ocr=False), chunks)
+                            sha256=digest, ocr=False), chunks)
 
 
 def parse_github_url(url: str) -> tuple[str, str]:

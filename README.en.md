@@ -1,5 +1,23 @@
 # PaperPilot Agent
 
+## Learn a paper inside your existing agent
+
+Install the package, then run `paperpilot skill-install` in your research project
+to copy the bundled `paperpilot-study` skill into `.agents/skills/`. Open a new
+agent session and ask it to teach one concept at a time, cite the paper, ask one
+question and wait for your answer. A repository is optional:
+
+```bash
+paperpilot --data-dir ./data learn start --pdf paper.pdf --goal "Understand the method"
+paperpilot --data-dir ./data notebook
+```
+
+The existing agent supplies reasoning; the CLI stores lessons, answers and
+feedback without another model API call. The notebook displays the original PDF beside the lesson, full learning notes
+and imported experiment comparisons. Original PDFs stay in the local data directory. Exact source quotes are checked, while explanation correctness and
+mastery assessments still require judgment. Paper-only reconstruction must keep
+missing settings and independent implementation choices explicit.
+
 [简体中文](README.md) · [Architecture](docs/architecture.md) · [Reproduction workflow](docs/reproduction.md) · [Deployment](docs/deployment.md)
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
@@ -19,7 +37,7 @@ compare measured metrics with paper results under explicit experimental protocol
 - Deterministic comparisons that expose changed splits, preprocessing, model,
   training budgets, evaluation definitions and units.
 
-Version 0.2.0 supports a personal workspace. An agent or researcher still selects
+Version 0.3.0 supports a personal workspace. An agent or researcher still selects
 the target, prepares an image and writes a metric adapter. This is not universal
 one-click paper reproduction. A successful run is separate from metric agreement.
 
