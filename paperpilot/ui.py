@@ -6,7 +6,7 @@ import os
 import httpx
 import streamlit as st
 
-st.set_page_config(page_title="PaperPilot · 实验复现工作区", page_icon="🧭", layout="wide")
+st.set_page_config(page_title="PaperPilot", page_icon="📄", layout="wide")
 API = os.getenv("PAPERPILOT_API_URL", "http://127.0.0.1:8000").rstrip("/")
 
 
@@ -17,17 +17,18 @@ def request(method: str, path: str, **kwargs):
 
 
 st.markdown("""<style>
-.stApp {background:linear-gradient(130deg,#f4f7fc 0%,#fff 70%);}
-h1 {letter-spacing:-1.4px;color:#142947;}
-[data-testid="stSidebar"] {background:#edf2fa;}
-[data-testid="stMetric"] {background:white;border:1px solid #dae3f1;border-radius:12px;padding:12px;}
+.stApp {background:#fff;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+h1 {letter-spacing:-1.2px;color:#1d1d1f;}
+[data-testid="stSidebar"] {background:#f5f5f7;}
+[data-testid="stMetric"] {background:#f5f5f7;border-radius:16px;padding:16px;}
 [data-testid="stMetricValue"] {font-size:1.3rem;}
 [data-testid="stMarkdownContainer"] h1 {font-size:clamp(1.5rem,2.5vw,2.3rem);}
-.block-container {padding-top:2rem;}
+.block-container {padding-top:3rem;max-width:1280px;}
+.stButton button,.stDownloadButton button {border-radius:12px;min-height:44px;}
+@media (max-width:640px) {.block-container {padding:1.5rem 1rem;}}
 </style>""", unsafe_allow_html=True)
-st.caption("P A P E R P I L O T  /  R E P R O D U C T I O N  W O R K S P A C E")
-st.title("读懂论文，对上代码，核对实验。")
-st.markdown("把论文、代码版本和实验结果放进同一个工作区，留下可以再次运行的依据。")
+st.title("PaperPilot")
+st.caption("从论文到实验，每个结论都有依据。")
 
 try:
     health = request("GET", "/health")
@@ -35,70 +36,69 @@ try:
     source_by_id = {s["id"]: s for s in sources}
     studies = [s for s in sources if s["kind"] == "study"]
     with st.sidebar:
-        st.header("🧭 PaperPilot")
-        st.caption("论文 × 代码 × 实验结果")
+        st.header("工作区")
         if health["mode"] == "mock":
             st.warning("MOCK · 真实检索预览\n\n不调用模型，不生成联合推理结论。")
         else:
-            st.success(f"LIVE · {health['model']}")
-        st.divider()
-        st.markdown("**复现路径**\n\n① 关联论文与代码\n\n② 核对方法与实验\n\n③ 审批并在主机运行\n\n④ 导入指标、比较协议")
-        st.caption("Web 不执行代码、不连接 Docker socket。\n已有 Agent 可直接使用 Skill / MCP / CLI。")
+            st.caption(f"模型：{health['model']}")
+            st.caption("真实分析需确认，可能产生 API 费用。")
 
-    research_tab, results_tab, integration_tab = st.tabs(["联合研究", "实验结果对照", "接入已有 Agent"])
+    research_tab, results_tab, integration_tab = st.tabs(["研究", "实验结果", "Agent 接入"])
     with research_tab:
         left, right = st.columns([1, 1.35], gap="large")
         with left:
-            st.subheader("01 / 导入研究材料")
-            uploaded = st.file_uploader("论文 PDF · 最多 20 MB / 150 页", type="pdf")
-            if st.button("导入论文", disabled=uploaded is None, use_container_width=True):
-                with st.spinner("提取页码与文字…"):
-                    imported = request("POST", "/sources/pdf", files={
-                        "file": (uploaded.name, uploaded.getvalue(), "application/pdf")})
-                    st.session_state.paper_id = imported["id"]
-                st.rerun()
-            url = st.text_input("对应的公开 GitHub 仓库", placeholder="https://github.com/locuslab/TCN")
-            if st.button("导入代码", disabled=not url, use_container_width=True):
-                with st.spinner("读取固定 commit 的主要文件…"):
-                    imported = request("POST", "/sources/github", json={"url": url})
-                    st.session_state.repository_id = imported["id"]
-                st.rerun()
-
-            st.subheader("02 / 关联与研究目标")
-            mode = st.radio("研究方式", ["论文＋代码", "单独分析"], horizontal=True)
-            if mode == "论文＋代码":
-                paper_ids = [s["id"] for s in sources if s["kind"] == "paper"]
-                repo_ids = [s["id"] for s in sources if s["kind"] == "repository"]
-                paper = st.selectbox("选择论文", paper_ids, format_func=lambda i: source_by_id[i]["title"],
-                                     key="paper_id")
-                repository = st.selectbox("选择代码版本", repo_ids,
-                    format_func=lambda i: source_by_id[i]["title"] + " · " + source_by_id[i]["metadata"]["commit"][:8],
-                    key="repository_id")
-                title = st.text_input("工作区名称", value="我的论文复现实验")
-                objective = st.text_input("目标实验 / 表格", value="讲解论文与代码，识别目标实验的复现条件和差异。")
-                if st.button("建立联合工作区", disabled=not paper or not repository or not title,
-                             use_container_width=True):
-                    st.session_state.source = request("POST", "/studies", json=dict(
-                        title=title, paper_id=paper, repository_id=repository, objective=objective))
-                    st.rerun()
-                if studies:
-                    chosen = st.selectbox("已有工作区", [s["id"] for s in studies],
-                                          format_func=lambda i: source_by_id[i]["title"])
-                    if st.button("打开工作区", use_container_width=True):
-                        st.session_state.source = source_by_id[chosen]
-            else:
-                singles = [s["id"] for s in sources if s["kind"] != "study"]
-                chosen = st.selectbox("已导入材料", singles, format_func=lambda i: source_by_id[i]["title"])
-                if chosen:
+            st.subheader("研究材料")
+            if studies:
+                chosen = st.selectbox("已有工作区", [s["id"] for s in studies],
+                                      format_func=lambda i: source_by_id[i]["title"])
+                if st.button("打开工作区", use_container_width=True):
                     st.session_state.source = source_by_id[chosen]
+            with st.expander("导入论文与代码", expanded=not sources):
+                uploaded = st.file_uploader("论文 PDF · 最多 20 MB / 150 页", type="pdf")
+                if st.button("导入论文", disabled=uploaded is None, use_container_width=True):
+                    with st.spinner("提取页码与文字…"):
+                        imported = request("POST", "/sources/pdf", files={
+                            "file": (uploaded.name, uploaded.getvalue(), "application/pdf")})
+                        st.session_state.paper_id = imported["id"]
+                    st.rerun()
+                url = st.text_input("对应的公开 GitHub 仓库", placeholder="https://github.com/locuslab/TCN")
+                if st.button("导入代码", disabled=not url, use_container_width=True):
+                    with st.spinner("读取固定 commit 的主要文件…"):
+                        imported = request("POST", "/sources/github", json={"url": url})
+                        st.session_state.repository_id = imported["id"]
+                    st.rerun()
+
+            mode = st.radio("研究方式", ["论文＋代码", "单独分析"], horizontal=True)
+            with st.expander("新建工作区 / 单独分析", expanded=not studies):
+                if mode == "论文＋代码":
+                    paper_ids = [s["id"] for s in sources if s["kind"] == "paper"]
+                    repo_ids = [s["id"] for s in sources if s["kind"] == "repository"]
+                    paper = st.selectbox("选择论文", paper_ids, format_func=lambda i: source_by_id[i]["title"],
+                                         key="paper_id")
+                    repository = st.selectbox("选择代码版本", repo_ids,
+                        format_func=lambda i: source_by_id[i]["title"] + " · " + source_by_id[i]["metadata"]["commit"][:8],
+                        key="repository_id")
+                    title = st.text_input("工作区名称", value="我的论文复现实验")
+                    objective = st.text_input("目标实验 / 表格", value="讲解论文与代码，识别目标实验的复现条件和差异。")
+                    if st.button("建立联合工作区", disabled=not paper or not repository or not title,
+                                 use_container_width=True):
+                        st.session_state.source = request("POST", "/studies", json=dict(
+                            title=title, paper_id=paper, repository_id=repository, objective=objective))
+                        st.rerun()
+                else:
+                    singles = [s["id"] for s in sources if s["kind"] != "study"]
+                    chosen = st.selectbox("已导入材料", singles, format_func=lambda i: source_by_id[i]["title"])
+                    if chosen:
+                        st.session_state.source = source_by_id[chosen]
             active = st.session_state.get("source")
             if mode == "论文＋代码" and active and active["kind"] != "study":
                 active = None
             if active:
-                st.success(f"当前：{active['title']}")
+                st.caption(f"当前工作区：{active['title']}")
                 with st.expander("来源版本与采样范围"):
                     st.json(active["metadata"])
-            template = st.selectbox("任务", [
+            st.subheader("开始研究")
+            template = st.selectbox("研究方向", [
                 "联合讲解论文和代码，说明方法对应的类、函数和配置，并列出不能确认的对应关系。",
                 "制定复现方案：核对 dataset split、preprocessing、training budget、evaluation，提取论文指标及命令草案。",
                 "排查复现差异：对照论文方法、数据处理、代码默认值和评估实现，列出需要验证的假设。"])
@@ -108,7 +108,7 @@ try:
                     "source_id": active["id"], "question": template + "\n" + extra})["id"]
 
         with right:
-            st.subheader("03 / 研究过程与复现方案")
+            st.subheader("研究报告")
 
             @st.fragment(run_every="2s")
             def task_panel():
@@ -131,7 +131,7 @@ try:
                     if no.button("拒绝发送"):
                         request("POST", f"/tasks/{job['id']}/approval", json={"approved": False})
                         st.rerun(scope="fragment")
-                with st.expander("计划与工具调用", expanded=job["status"] != "completed"):
+                with st.expander("查看执行过程", expanded=job["status"] == "running"):
                     for event in job["events"]:
                         st.caption(f"{event['time'][11:19]} UTC · {event['stage']}")
                         st.json(event["detail"], expanded=False)
@@ -178,7 +178,7 @@ try:
                             st.caption(f"差值（实测 − 论文）：{row['delta']:.6g}；显示值取 6 位有效数字，下载保留原值。")
                         st.write("；".join(row["reasons"]) or "声明的协议与单位一致，已按预设容差比较。")
                         st.caption(row["paper_location"])
-                with st.expander("核对实验协议", expanded=True):
+                with st.expander("核对实验协议"):
                     for difference in result["comparison"]["protocol_differences"]:
                         st.markdown(f"**{difference['field']}**\n\n论文：{difference['paper']}\n\n实测：{difference['actual']}")
                     st.caption(result["comparison"]["conclusion"])
