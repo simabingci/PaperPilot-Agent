@@ -7,6 +7,15 @@ to copy the bundled `paperpilot-study` skill into `.agents/skills/`. Open a new
 agent session and ask it to teach one concept at a time, cite the paper, ask one
 question and wait for your answer. A repository is optional:
 
+For Claude Code use `paperpilot skill-install --agent claude-code`; for DeepSeek
+Harness use `--agent deepseek-harness`. `--agent workbuddy` builds a local skill
+ZIP for import. All use the same CLI and absolute data directory, allowing
+sequential client switching. Native client conversations have not been tested
+for these three adapters; installation, generated configurations and real stdio
+tool calls are covered. See [client setup and limits](docs/integrations.md).
+
+Start a paper-only session:
+
 ```bash
 paperpilot --data-dir ./data learn start --pdf paper.pdf --goal "Understand the method"
 paperpilot --data-dir ./data notebook

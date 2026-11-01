@@ -11,6 +11,16 @@ use the project Python or `paperpilot --help`. If unavailable, explain what is
 missing. Do not
 silently configure a model API, download datasets, or start experiments.
 
+This skill works in Codex, Claude Code, DeepSeek Harness and WorkBuddy when the
+host can read local files and execute the installed Python command. Use the
+runtime command as an argument array with your host's shell quoting; do not
+assume Bash or that `paperpilot` is on PATH. Never interpret the JSON command
+array as a single executable path. Keep the same absolute data directory when
+switching clients so lessons and pending questions remain available.
+MCP alone exposes read-only evidence and learning context; use the CLI to import
+papers and save lessons, real answers and feedback. If the host cannot run local
+commands, explain this limitation rather than claiming progress was saved.
+
 ## Open or resume
 
 Use a stable `--data-dir PATH` before each subcommand; prefer a project-local

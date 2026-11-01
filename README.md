@@ -1,6 +1,6 @@
 # PaperPilot Agent
 
-[English](README.en.md) · [架构](docs/architecture.md) · [复现流程](docs/reproduction.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
+[English](README.en.md) · [Agent 接入](docs/integrations.md) · [架构](docs/architecture.md) · [复现流程](docs/reproduction.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
 
@@ -47,7 +47,22 @@ python -m pip install -e .
 
 安装项目后，在自己的科研项目目录运行 `paperpilot skill-install`，将
 `paperpilot-study` 和当前 Python 运行信息安装到该目录的 `.agents/skills/`，在新的 Codex 会话中使用。
-无需再配置 PaperPilot 模型 Key。示例请求：
+无需再配置 PaperPilot 模型 Key。
+
+使用其他客户端时，替换安装命令即可：
+
+```bash
+paperpilot skill-install --agent claude-code
+paperpilot skill-install --agent deepseek-harness
+paperpilot skill-install --agent workbuddy
+```
+
+Claude Code/Harness 安装项目 Skill；WorkBuddy 生成供本机上传的 Skill ZIP。
+同一个 `--data-dir` 可顺序跨客户端继续学习。另提供 MCP 配置导出，不改全局配置。
+这些适配已做安装与真实协议调用测试，三种原生客户端尚未逐一对话验收；
+步骤与边界见 [Agent 接入](docs/integrations.md)。
+
+示例请求：
 
 > 使用 paperpilot-study 带我读这篇论文。一次只讲一个概念，结合原文解释，
 > 问一个理解题，等我回答后再继续；保存学习记录。这篇论文没有源码。

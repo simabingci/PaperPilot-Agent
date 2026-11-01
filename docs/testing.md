@@ -104,3 +104,11 @@ split、training_budget 和 smoke 范围。下载报告后与原始 metrics.json
 这些数据衡量证据提供与原页读取，不代表回答准确率或用户学习收益。
 本地原页保留、渲染、全文导出、学习状态恢复、显式跳过和安装后跨目录调用由
 reader/learning测试覆盖。真实用户教学效果、独立保留论文评测仍未完成。
+
+## 客户端适配
+
+`tests/test_integrations.py` 验证各客户端的 Skill 目录、WorkBuddy ZIP 元信息与资源，
+使用每份导出配置的启动参数连接真实 stdio MCP，检索原创 PDF 的页码并恢复学习上下文。
+另验证不同安装的 CLI 能顺序恢复同一个待回答问题，以及拒绝覆盖已有配置。
+这些是本地适配和协议测试，不是 Claude Code、Harness、WorkBuddy 原生 UI/模型对话验收，
+不会调用它们的模型账户。宿主发现、权限和模型质量需在对应客户端进一步验证。

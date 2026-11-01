@@ -28,7 +28,7 @@ config.prepare()
 store = Store(config.data_dir)
 records = sessions(store)
 if not records:
-    st.info("把论文交给 Codex，请它使用 paperpilot-study。开始后，你的原文与学习笔记会出现在这里。")
+    st.info("把论文交给你的 Agent，请它使用 paperpilot-study。开始后，你的原文与学习笔记会出现在这里。")
     with st.expander("查看开始命令"):
         st.code('paperpilot --data-dir ./data learn start --pdf paper.pdf --goal "读懂方法与实验"')
 else:
@@ -43,7 +43,7 @@ else:
         with lesson_column:
             lessons = record["lessons"]
             if not lessons:
-                st.info("学习目标已保存。回到 Codex，先从研究问题开始。")
+                st.info("学习目标已保存。回到你的 Agent，先从研究问题开始。")
                 current = None
             else:
                 selected = st.selectbox("正在阅读的概念", range(len(lessons)), index=len(lessons)-1,
@@ -62,7 +62,7 @@ else:
                 elif "skipped" in current:
                     st.caption("本题已跳过：" + current["skipped"])
                 else:
-                    st.caption("回到 Codex 回答或讨论，再刷新此页。")
+                    st.caption("回到你的 Agent 回答或讨论，再刷新此页。")
                 with st.expander("依据与待确认项"):
                     references = current["evidence"] + current.get("review", {}).get("evidence", [])
                     for ref in references:

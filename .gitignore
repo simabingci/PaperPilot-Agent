@@ -18,3 +18,5 @@ htmlcov/
 
 # Generated local skill installation (contains machine-specific runtime paths)
 .agents/skills/paperpilot-study/
+.claude/skills/paperpilot-study/
+.dsh/skills/paperpilot-study/

@@ -80,7 +80,7 @@ def test_learning_rejects_foreign_or_fabricated_evidence_without_saving(store, p
 
 
 async def test_skill_installs_resources_and_preserves_existing_folder(tmp_path):
-    args = Namespace(command="skill-install", dest=tmp_path, update=False, data_dir=tmp_path / "data")
+    args = Namespace(command="skill-install", agent="codex", dest=tmp_path, update=False, data_dir=tmp_path / "data")
     result = await main_async(args)
     installed = Path(result["installed"])
     assert (installed / "SKILL.md").is_file()
@@ -99,7 +99,7 @@ def test_notebook_shows_empty_and_pending_question_without_fabricating_answer(st
     app = AppTest.from_file(str(Path(__file__).parents[1] / "paperpilot/learning_ui.py"))
     app.run()
     assert not app.exception
-    assert any("把论文交给 Codex" in item.value for item in app.info)
+    assert any("把论文交给你的 Agent" in item.value for item in app.info)
     record = start(store, paper["id"], "Understand the method")
     lesson = lesson_for(store, paper)
     lesson["evidence"][0]["quote"] = "Adam with learning rate 0.001"

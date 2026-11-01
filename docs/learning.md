@@ -15,6 +15,8 @@ paperpilot skill-install
 不覆盖本地修改。显式使用 `--update` 才替换打包的 Skill 文件，并保留其他本地文件。
 安装时也记录当前 Python 命令和数据目录，使 Agent 不依赖终端已激活 venv。也可指定 `--dest PATH`。这是项目技能安装，不修改全局 Codex
 配置、不配置 Key。新会话中请 Agent 使用 `paperpilot-study`。
+Claude Code、DeepSeek Harness、WorkBuddy 通过 `--agent` 选择安装格式，
+共用同一学习存储；完整步骤及验收边界见 [Agent 接入](integrations.md)。
 参见 [官方 Skills 说明](https://developers.openai.com/codex/skills/)。
 
 为每个科研项目保留稳定的 `--data-dir`，并将数据、笔记加入该项目的 Git 忽略规则。

@@ -83,7 +83,8 @@ async def test_one_command_start_expanded_evidence_and_mcp_resume(store, pdf_byt
 
 
 async def test_installed_runtime_executes_from_another_directory(tmp_path):
-    args = Namespace(command="skill-install", dest=tmp_path / "skills", data_dir=tmp_path / "records", update=False)
+    args = Namespace(command="skill-install", agent="codex", dest=tmp_path / "skills",
+                     data_dir=tmp_path / "records", update=False)
     result = await main_async(args)
     from pathlib import Path
     runtime = json.loads((Path(result["installed"]) / "references/runtime.json").read_text())

@@ -4,7 +4,6 @@ import argparse
 import asyncio
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +14,7 @@ from mcp import Client, StdioServerParameters
 from paperpilot.config import Settings
 from paperpilot.experiments import ResultSubmission, compare_results, comparison_markdown, record_result
 from paperpilot.ingest import MAX_PDF_BYTES, ingest_github, ingest_pdf
+from paperpilot.integrations import AGENTS, install_skill, mcp_config
 from paperpilot.learning import Lesson, Review, context, markdown, session, sessions, start, update
 from paperpilot.reader import export_text, paper_source, pdf_path, read_page, render_page
 from paperpilot.runner import Recipe, execute_recipe, review_recipe
@@ -26,12 +26,14 @@ async def main_async(args) -> dict:
         return {"recipe": Recipe, "result": ResultSubmission, "lesson": Lesson, "review": Review}[
             args.kind].model_json_schema()
     if args.command == "skill-install":
-        target = args.dest.resolve() / "paperpilot-study"
-        shutil.copytree(Path(__file__).parent / "skills" / "paperpilot-study", target, dirs_exist_ok=args.update)
-        runtime = dict(command=[sys.executable, "-X", "utf8", "-m", "paperpilot.cli"],
-                       data_dir=str((args.data_dir or Path("data")).resolve()))
-        (target / "references" / "runtime.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
-        return dict(installed=str(target), note="Open a new agent session to discover the installed skill.")
+        return install_skill(args.agent, args.dest, args.data_dir or Settings().data_dir, args.update)
+    if args.command == "mcp-config":
+        content = mcp_config(args.agent, args.data_dir or Settings().data_dir)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        with args.output.open("x", encoding="utf-8") as stream:
+            stream.write(content)
+        return dict(agent=args.agent, output=str(args.output.resolve()),
+                    note="Merge the paperpilot entry into your client config; no client settings were modified.")
     if args.command == "inspect":
         return review_recipe(args.recipe)[1]
     if args.command == "run":
@@ -151,8 +153,13 @@ def main() -> None:
     text.add_argument("--source", required=True)
     text.add_argument("--output", type=Path, required=True)
     install = commands.add_parser("skill-install", help="Install the study skill; an existing folder is never overwritten")
-    install.add_argument("--dest", type=Path, default=Path(".agents/skills"))
+    install.add_argument("--agent", choices=AGENTS, default="codex")
+    install.add_argument("--dest", type=Path, help="Override this client's project skill directory")
     install.add_argument("--update", action="store_true", help="Explicitly replace bundled files, keep other files")
+    config = commands.add_parser("mcp-config", help="Export a local stdio config fragment; never edits client settings")
+    config.add_argument("--agent", choices=["claude-code", "deepseek-harness", "workbuddy", "generic"],
+                        required=True)
+    config.add_argument("--output", type=Path, required=True, help="New file only; existing files are preserved")
     notebook = commands.add_parser("notebook", help="Read original pages, learning notes and results locally")
     notebook.add_argument("--port", type=int, default=8501)
     learn = commands.add_parser("learn", help="Persist one-concept lessons, learner answers and agent feedback")
