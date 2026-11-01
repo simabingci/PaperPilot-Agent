@@ -28,7 +28,7 @@ async def main_async(args) -> dict:
     if args.command == "skill-install":
         target = args.dest.resolve() / "paperpilot-study"
         shutil.copytree(Path(__file__).parent / "skills" / "paperpilot-study", target, dirs_exist_ok=args.update)
-        runtime = dict(command=[sys.executable, "-m", "paperpilot.cli"],
+        runtime = dict(command=[sys.executable, "-X", "utf8", "-m", "paperpilot.cli"],
                        data_dir=str((args.data_dir or Path("data")).resolve()))
         (target / "references" / "runtime.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
         return dict(installed=str(target), note="Open a new agent session to discover the installed skill.")
@@ -125,6 +125,8 @@ async def main_async(args) -> dict:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="PaperPilot reproducible research workspace")
     parser.add_argument("--data-dir", type=Path, help="Evidence database directory (default: env or ./data)")
     commands = parser.add_subparsers(dest="command", required=True)

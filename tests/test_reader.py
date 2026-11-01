@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import subprocess
 import sys
 from argparse import Namespace
@@ -14,6 +15,7 @@ from paperpilot.ingest import ingest_pdf
 from paperpilot.learning import context, start, update
 from paperpilot.mcp_server import create_server
 from paperpilot.reader import export_text, pdf_path, read_page, render_page
+from paperpilot.store import Store
 
 
 def test_original_page_retention_render_and_full_text_export(store, pdf_bytes, tmp_path):
@@ -89,6 +91,12 @@ async def test_installed_runtime_executes_from_another_directory(tmp_path):
     output = subprocess.run(runtime["command"] + ["--data-dir", runtime["data_dir"], "learn", "list"],
                             cwd=tmp_path, capture_output=True, check=True)
     assert json.loads(output.stdout) == {"sessions": []}
+    title = "中文论文 ∑ 📖"
+    Store(Path(runtime["data_dir"])).add_source("paper", title, {}, [])
+    output = subprocess.run(runtime["command"] + ["--data-dir", runtime["data_dir"], "list"],
+                            cwd=tmp_path, capture_output=True, check=True,
+                            env=os.environ | {"PYTHONIOENCODING": "ascii"})
+    assert json.loads(output.stdout)["sources"][0]["title"] == title
 
 
 def test_paper_reader_resolves_linked_study_and_rejects_code_only(store, pdf_bytes):
