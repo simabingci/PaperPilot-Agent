@@ -1,6 +1,7 @@
 """Regression tests for the 0.3.1 hardening: bounded model repair, protocol identity, caching, migrations."""
 
 import json
+import sys
 
 import pytest
 from langchain_core.messages import AIMessage
@@ -208,7 +209,7 @@ def test_connect_writes_codex_toml(tmp_path, monkeypatch):
     parsed = tomllib.loads(config.read_text(encoding="utf-8"))
     assert parsed["model"] == "gpt-x"
     assert "node_repl" in parsed["mcp_servers"]
-    assert parsed["mcp_servers"]["paperpilot"]["command"].endswith("python.exe")
+    assert parsed["mcp_servers"]["paperpilot"]["command"] == sys.executable
     assert "PAPERPILOT_DATA_DIR" in parsed["mcp_servers"]["paperpilot"]["env"]
 
     assert integrations.connect_agent("codex", data)["status"] == "already_configured"

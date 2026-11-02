@@ -53,10 +53,13 @@ commit 的代码行，把带页码/行号的证据打印成 JSON。
 
 ```bash
 paperpilot connect --agent deepseek-harness --data-dir ./data
+paperpilot connect --agent codex --data-dir ./data           # 写入 ~/.codex/config.toml
+paperpilot connect --agent codex --data-dir ./data --dry-run # 只预览，不写入
 ```
 
-这条命令只做一件事：把 `paperpilot` 的 MCP 条目写进该客户端的配置（先备份原文件），
-然后提示你重启客户端。重启后在新会话里直接说：
+这两条命令只做一件事：把 `paperpilot` 的 MCP 条目写进该客户端的配置（先备份原文件，
+写入后用 YAML/TOML 解析器校验，失败自动回滚），然后提示你重启客户端。重启后在新会话里
+直接说：
 
 > 用 paperpilot 读这篇论文，讲清方法、实验条件和缺失信息。
 
