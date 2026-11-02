@@ -12,9 +12,10 @@ import httpx
 from mcp import Client, StdioServerParameters
 
 from paperpilot.config import Settings
+from paperpilot.doctor import run_checks
 from paperpilot.experiments import ResultSubmission, compare_results, comparison_markdown, record_result
 from paperpilot.ingest import MAX_PDF_BYTES, ingest_github, ingest_pdf
-from paperpilot.integrations import AGENTS, install_skill, mcp_config
+from paperpilot.integrations import AGENTS, connect_agent, install_skill, mcp_config
 from paperpilot.learning import Lesson, Review, context, markdown, session, sessions, start, update
 from paperpilot.reader import export_text, paper_source, pdf_path, read_page, render_page
 from paperpilot.runner import Recipe, execute_recipe, review_recipe
@@ -22,11 +23,19 @@ from paperpilot.store import Store
 
 
 async def main_async(args) -> dict:
+    if args.command == "doctor":
+        settings = Settings()
+        if args.data_dir:
+            settings.data_dir = args.data_dir
+        return run_checks(settings)
     if args.command == "schema":
         return {"recipe": Recipe, "result": ResultSubmission, "lesson": Lesson, "review": Review}[
             args.kind].model_json_schema()
     if args.command == "skill-install":
         return install_skill(args.agent, args.dest, args.data_dir or Settings().data_dir, args.update)
+    if args.command == "connect":
+        return connect_agent(args.agent, args.data_dir or Settings().data_dir, args.profile,
+                             args.force, args.dry_run)
     if args.command == "mcp-config":
         content = mcp_config(args.agent, args.data_dir or Settings().data_dir)
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +148,7 @@ def main() -> None:
     init.add_argument("--title", required=True)
     init.add_argument("--objective", default="Explain paper and code; plan the target experiment.")
     commands.add_parser("list")
+    commands.add_parser("doctor", help="Check Python, data directory, PDF engine, Docker and model configuration")
     evidence = commands.add_parser("evidence", help="Retrieve source evidence through real MCP; no model API")
     evidence.add_argument("--study", "--source", dest="study", required=True)
     evidence.add_argument("--query", required=True)
@@ -160,6 +170,11 @@ def main() -> None:
     config.add_argument("--agent", choices=["claude-code", "deepseek-harness", "workbuddy", "generic"],
                         required=True)
     config.add_argument("--output", type=Path, required=True, help="New file only; existing files are preserved")
+    connect = commands.add_parser("connect", help="Write PaperPilot into your agent's own config (no model key needed)")
+    connect.add_argument("--agent", choices=["deepseek-harness", "codex"], default="deepseek-harness")
+    connect.add_argument("--profile", default="desktop", help="DSH profile name under ~/.dsh/profiles")
+    connect.add_argument("--force", action="store_true", help="Replace an existing paperpilot entry")
+    connect.add_argument("--dry-run", action="store_true", help="Print the block that would be written")
     notebook = commands.add_parser("notebook", help="Read original pages, learning notes and results locally")
     notebook.add_argument("--port", type=int, default=8501)
     learn = commands.add_parser("learn", help="Persist one-concept lessons, learner answers and agent feedback")
@@ -210,6 +225,8 @@ def main() -> None:
         result = asyncio.run(main_async(args))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if args.command == "run" and result["status"] != "completed":
+            raise SystemExit(1)
+        if args.command == "doctor" and result["overall"] == "fail":
             raise SystemExit(1)
     except (ValueError, OSError, httpx.HTTPError, subprocess.SubprocessError) as exc:
         parser.exit(1, f"PaperPilot: {exc}\n")

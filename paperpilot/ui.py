@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 
 import httpx
 import streamlit as st
@@ -9,11 +10,28 @@ import streamlit as st
 st.set_page_config(page_title="PaperPilot", page_icon="📄", layout="wide")
 API = os.getenv("PAPERPILOT_API_URL", "http://127.0.0.1:8000").rstrip("/")
 
+ENV_KEYS = {"PAPERPILOT_MODE", "OPENAI_BASE_URL", "OPENAI_MODEL", "OPENAI_API_KEY"}
+
 
 def request(method: str, path: str, **kwargs):
     response = httpx.request(method, API + path, timeout=120, **kwargs)
     response.raise_for_status()
     return response.json()
+
+
+def write_env(base_url: str, model: str, api_key: str) -> Path:
+    """Persist model settings for the API process; the UI never keeps the key itself."""
+    path = Path(".env")
+    kept = []
+    if path.exists():
+        kept = [line for line in path.read_text(encoding="utf-8").splitlines()
+                if line.split("=", 1)[0].strip() not in ENV_KEYS]
+    lines = kept + ["PAPERPILOT_MODE=live", f"OPENAI_BASE_URL={base_url}",
+                    f"OPENAI_MODEL={model}", f"OPENAI_API_KEY={api_key}"]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if os.name != "nt":
+        path.chmod(0o600)
+    return path.resolve()
 
 
 st.markdown("""<style>
@@ -38,10 +56,28 @@ try:
     with st.sidebar:
         st.header("工作区")
         if health["mode"] == "mock":
-            st.warning("MOCK · 真实检索预览\n\n不调用模型，不生成联合推理结论。")
+            st.error("MOCK · 不调用模型")
+            st.caption("只做解析与检索，不产生分析结论。")
         else:
-            st.caption(f"模型：{health['model']}")
-            st.caption("真实分析需确认，可能产生 API 费用。")
+            st.success(f"LIVE · {health['model']}")
+            st.caption("每次任务开始前会暂停，等你确认是否发送数据。")
+        with st.expander("接入模型（切到 LIVE）"):
+            base_url = st.text_input("OpenAI 兼容地址",
+                                     value=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"))
+            model_name = st.text_input("模型名", value=os.getenv("OPENAI_MODEL", ""))
+            api_key = st.text_input("API Key", type="password")
+            if st.button("写入 .env", disabled=not (model_name and api_key), use_container_width=True):
+                saved = write_env(base_url, model_name, api_key)
+                st.success(f"已写入 {saved}；重启 API 后生效。")
+            st.caption("重启 API：`python -m uvicorn paperpilot.api:create_app --factory --port 8000`")
+
+    if health["mode"] == "mock":
+        st.warning(
+            "**当前是「证据预览」模式，系统不会调用大模型**——下面看到的是检索到的原文片段，"
+            "不是分析结论。要看真正的讲解，按三步切到 LIVE：\n\n"
+            "1. 左侧「接入模型（切到 LIVE）」填入兼容 OpenAI 的地址、模型名和 Key；\n"
+            "2. 重启 API（它启动时读取 `.env`）；\n"
+            "3. 刷新本页，顶部会变成 LIVE。")
 
     research_tab, results_tab, integration_tab = st.tabs(["研究", "实验结果", "Agent 接入"])
     with research_tab:
@@ -103,12 +139,13 @@ try:
                 "制定复现方案：核对 dataset split、preprocessing、training budget、evaluation，提取论文指标及命令草案。",
                 "排查复现差异：对照论文方法、数据处理、代码默认值和评估实现，列出需要验证的假设。"])
             extra = st.text_area("补充问题 / 指定实验", height=90, placeholder="例如：重点解释 Table 4 的 Adding Problem T=600。")
-            if st.button("开始研究 →", type="primary", use_container_width=True, disabled=active is None):
+            start_label = "生成证据预览（不调用模型）" if health["mode"] == "mock" else "开始研究 →"
+            if st.button(start_label, type="primary", use_container_width=True, disabled=active is None):
                 st.session_state.job_id = request("POST", "/tasks", json={
                     "source_id": active["id"], "question": template + "\n" + extra})["id"]
 
         with right:
-            st.subheader("研究报告")
+            st.subheader("证据预览（未进行模型分析）" if health["mode"] == "mock" else "研究报告")
 
             @st.fragment(run_every="2s")
             def task_panel():
@@ -138,6 +175,9 @@ try:
                 if job["status"] == "failed":
                     st.error(job["error"])
                 if job["status"] == "completed":
+                    if health["mode"] == "mock":
+                        st.info("下面是检索到的原文片段，**不是分析结论**。接入模型后，这里会变成"
+                                "方法映射、实验目标、缺失条件和差异排查。")
                     st.download_button("下载研究报告", job["markdown"], file_name="paperpilot-study.md",
                                        mime="text/markdown", use_container_width=True)
                     st.download_button("下载结构化分析", json.dumps(job.get("structured_report", {}), ensure_ascii=False,

@@ -7,6 +7,16 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+SCHEMA_VERSION = 1
+
+
+def _add_study_index(db: sqlite3.Connection) -> None:
+    db.execute("CREATE INDEX IF NOT EXISTS results_study ON results(study_id)")
+
+
+# Ordered, forward-only migrations; never edit a shipped step, append a new one.
+MIGRATIONS: list[tuple[int, Any]] = [(1, _add_study_index)]
+
 
 class Store:
     def __init__(self, data_dir: Path):
@@ -24,7 +34,26 @@ class Store:
                 CREATE TABLE IF NOT EXISTS results(id TEXT PRIMARY KEY, study_id TEXT NOT NULL,
                     payload TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS learning(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """)
+            self._migrate(db)
+
+    def _migrate(self, db: sqlite3.Connection) -> None:
+        row = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        current = int(row[0]) if row else 0
+        if current > SCHEMA_VERSION:
+            raise ValueError(f"数据目录版本 {current} 高于本程序支持的 {SCHEMA_VERSION}，请升级 PaperPilot")
+        for version, step in MIGRATIONS:
+            if current < version:
+                step(db)
+                current = version
+        db.execute("INSERT INTO meta VALUES ('schema_version', ?) "
+                   "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(current),))
+
+    def schema_version(self) -> int:
+        with self.connect() as db:
+            row = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        return int(row[0]) if row else 0
 
     def connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.path, timeout=20)

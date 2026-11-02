@@ -9,8 +9,26 @@ from pydantic import Field
 from paperpilot.config import Settings
 from paperpilot.learning import context
 from paperpilot.reader import read_page
-from paperpilot.retrieval import search
+from paperpilot.retrieval import search_multi
 from paperpilot.store import Store
+
+_RESULT_TEXT_LIMIT = 16000
+_MAX_RESULT_ROWS = 10
+
+
+def bounded_result_text(payload: dict, limit: int = _RESULT_TEXT_LIMIT) -> tuple[str, bool]:
+    """Trim comparison rows before serialising so the model never receives half a JSON object."""
+    text = json.dumps(payload, ensure_ascii=False)
+    if len(text) <= limit:
+        return text, False
+    comparison = dict(payload["comparison"], rows=payload["comparison"].get("rows", [])[:_MAX_RESULT_ROWS])
+    payload = dict(payload, comparison=comparison)
+    text = json.dumps(payload, ensure_ascii=False)
+    if len(text) <= limit:
+        return text, True
+    payload = dict(payload, comparison=dict(comparison, rows=[],
+        note="对照明细因长度限制省略；原始 comparison-input.json 保留在运行目录"))
+    return json.dumps(payload, ensure_ascii=False), True
 
 
 def create_server(store: Store) -> MCPServer:
@@ -36,10 +54,16 @@ def create_server(store: Store) -> MCPServer:
 
     @server.tool(structured_output=True)
     def paper_search(source_id: str, query: Annotated[str, Field(min_length=1, max_length=1500)]) -> dict[str, Any]:
-        """Retrieve uploaded paper passages with physical PDF page numbers."""
+        """Retrieve uploaded paper passages with physical PDF page numbers.
+
+        A Chinese query is also run with an English keyword expansion, because the
+        character retriever shares almost no n-grams across languages.
+        """
         if store.source(source_id)["kind"] != "paper":
             raise ValueError("paper_search 只接受论文来源")
-        return dict(matches=[dict(c, source_kind="paper") for c in search(store, source_id, query)])
+        matches, expansions = search_multi(store, source_id, query)
+        return dict(matches=[dict(c, source_kind="paper") for c in matches],
+                    expanded_queries=expansions)
 
     @server.tool(structured_output=True)
     def code_search(source_id: str, query: Annotated[str, Field(min_length=1, max_length=1500)],
@@ -47,7 +71,9 @@ def create_server(store: Store) -> MCPServer:
         """Retrieve inspected repository code with commit-pinned file and line citations."""
         if store.source(source_id)["kind"] != "repository":
             raise ValueError("code_search 只接受仓库来源")
-        return dict(matches=[dict(c, source_kind="repository") for c in search(store, source_id, query, path=path)])
+        matches, expansions = search_multi(store, source_id, query, path=path)
+        return dict(matches=[dict(c, source_kind="repository") for c in matches],
+                    expanded_queries=expansions)
 
     @server.tool(structured_output=True)
     def study_search(source_id: str, query: Annotated[str, Field(min_length=1, max_length=1500)],
@@ -57,10 +83,13 @@ def create_server(store: Store) -> MCPServer:
         if source["kind"] != "study":
             raise ValueError("study_search 需要复现工作区 ID")
         matches = []
+        expansions: list[str] = []
         for key, kind in [("paper_id", "paper"), ("repository_id", "repository")]:
-            matches.extend(dict(c, source_kind=kind) for c in search(store, source["metadata"][key], query,
-                                                                    path=path if kind == "repository" else None))
-        return dict(matches=matches)
+            hits, variants = search_multi(store, source["metadata"][key], query,
+                                          path=path if kind == "repository" else None)
+            matches.extend(dict(c, source_kind=kind) for c in hits)
+            expansions.extend(variant for variant in variants if variant not in expansions)
+        return dict(matches=matches, expanded_queries=expansions)
 
     @server.tool(structured_output=True)
     def paper_page(source_id: str, page: Annotated[int, Field(ge=1)]) -> dict[str, Any]:
@@ -85,12 +114,12 @@ def create_server(store: Store) -> MCPServer:
         results = store.results(source_id)
         matches = []
         for result in results[:3]:
-            text = json.dumps(dict(comparison=result["comparison"], scope=result["submission"]["scope"],
-                observed_protocol=result["submission"]["observed"]["protocol"], provenance=result["provenance"]),
-                ensure_ascii=False)
-            matches.append(dict(id=f"result-{result['id']}", source_kind="experiment", text=text[:16000],
+            payload = dict(comparison=result["comparison"], scope=result["submission"]["scope"],
+                observed_protocol=result["submission"]["observed"]["protocol"], provenance=result["provenance"])
+            text, truncated = bounded_result_text(payload)
+            matches.append(dict(id=f"result-{result['id']}", source_kind="experiment", text=text,
                 location=f"导入结果 {result['id']}（外部提交，未认证执行；最多展示最近 3 条）",
-                url="", truncated=len(text) > 16000))
+                url="", truncated=truncated))
         return dict(total_results=len(results), matches=matches)
 
     return server

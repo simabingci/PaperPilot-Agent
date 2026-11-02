@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -7,7 +8,7 @@ from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from pydantic import BaseModel, Field, StringConstraints
@@ -16,7 +17,7 @@ from paperpilot.config import Settings
 from paperpilot.experiments import ResultSubmission, record_result
 from paperpilot.ingest import MAX_PDF_BYTES, ingest_github, ingest_pdf
 from paperpilot.store import Store
-from paperpilot.workflow import build_graph
+from paperpilot.workflow import ModelOutputError, build_graph
 
 logger = logging.getLogger("paperpilot")
 
@@ -63,8 +64,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 task.cancel()
             await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-    app = FastAPI(title="PaperPilot Agent", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="PaperPilot Agent", version="0.3.1", lifespan=lifespan)
     app.state.store = store
+
+    token = config.api_token.get_secret_value()
+
+    @app.middleware("http")
+    async def require_token(request, call_next):
+        # Health and metrics stay open for container probes; the data routes are gated when a token is set.
+        if token and request.url.path not in {"/health", "/metrics"}:
+            supplied = request.headers.get("authorization", "")
+            if not hmac.compare_digest(supplied, f"Bearer {token}"):
+                return JSONResponse(status_code=401, content={"detail": "需要有效的 Bearer token"})
+        return await call_next(request)
 
     async def run(job_id: str, value) -> None:
         async with limit:
@@ -108,6 +120,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+    @app.exception_handler(ModelOutputError)
+    async def model_output_error(request, exc):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=502, content={"detail": str(exc), "error_code": "model_output_invalid"})
+
     @app.exception_handler(httpx.HTTPError)
     async def upstream_error(request, exc):
         from fastapi.responses import JSONResponse
@@ -117,7 +134,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     def health():
         return dict(status="ok", mode=config.mode, model=config.model if config.mode == "live" else None,
-                    retrieval="character-hashing sparse vectors", version="0.3.0")
+                    retrieval="character-hashing sparse vectors", version="0.3.1")
+
+    @app.get("/metrics")
+    def metrics():
+        """Operational counters for a self-hosted instance; no user content is exposed."""
+        jobs = store.jobs()
+        counts: dict[str, int] = {}
+        for item in jobs:
+            counts[item["status"]] = counts.get(item["status"], 0) + 1
+        return dict(mode=config.mode, version="0.3.1", schema_version=store.schema_version(),
+                    sources=len(store.sources()), jobs_tracked=len(jobs), jobs_by_status=counts,
+                    model_tokens_limit=config.model_max_tokens if config.mode == "live" else None)
 
     @app.get("/sources")
     def sources():

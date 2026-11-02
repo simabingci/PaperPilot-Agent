@@ -1,10 +1,17 @@
 # PaperPilot Agent
 
-[English](README.en.md) · [Agent 接入](docs/integrations.md) · [架构](docs/architecture.md) · [复现流程](docs/reproduction.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
+[English](README.en.md) · [十分钟上手](docs/quickstart.md) · [Agent 接入](docs/integrations.md) · [架构](docs/architecture.md) · [复现流程](docs/reproduction.md) · [部署](docs/deployment.md) · [测试](docs/testing.md)
 
 [![Tests](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/simabingci/PaperPilot-Agent/actions/workflows/ci.yml)
 
 **在已有 Agent 中读懂论文，连接方法、代码与实验。**
+
+不需要额外模型 Key：把 PaperPilot 接进你正在用的 Agent，它负责推理，PaperPilot 负责
+可追溯的证据、版本与实验记录。
+
+```bash
+paperpilot connect --agent deepseek-harness   # 写入客户端配置（自动备份），重启客户端即可
+```
 
 PaperPilot 为个人和课题组提供本地科研学习工作区。沿用已有 Agent 的推理能力，
 保存论文依据、逐轮讲解、真实回答与反馈；原文和笔记可以在同一个页面对照阅读。

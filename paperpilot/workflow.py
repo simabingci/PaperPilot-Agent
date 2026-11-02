@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from mcp import Client, StdioServerParameters
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from paperpilot.config import Settings
 from paperpilot.skills import load_skill
@@ -86,31 +86,70 @@ class State(TypedDict, total=False):
     report_feedback: str
 
 
+class ModelOutputError(ValueError):
+    """The configured model never returned a usable structured value; the job fails loudly."""
+
+
 def chat_model(settings: Settings) -> ChatOpenAI:
     return ChatOpenAI(model=settings.model, base_url=settings.base_url,
                       api_key=settings.api_key.get_secret_value(), temperature=0,
-                      timeout=90, max_retries=0, max_tokens=5000, extra_body=settings.model_extra_body)
+                      timeout=settings.model_timeout_seconds, max_retries=0,
+                      max_tokens=settings.model_max_tokens, extra_body=settings.model_extra_body)
+
+
+def wire_schema(schema: type[BaseModel], user: dict) -> dict:
+    """Expose the live evidence IDs as the only allowed citations for this call."""
+    wire = schema.model_json_schema()
+    if issubclass(schema, Report):
+        for definition in wire["$defs"].values():
+            for name, field in definition.get("properties", {}).items():
+                if name.endswith("source_ids"):
+                    kind = ("paper" if name == "paper_source_ids"
+                            else "repository" if name == "code_source_ids" else None)
+                    field["items"]["enum"] = [item["id"] for item in user["evidence"]
+                                               if kind is None or item.get("source_kind") == kind]
+    return wire
+
+
+TRUNCATED_RETRY = dict(reason="previous_output_truncated",
+    instruction="上一次输出达到长度上限被截断。只保留最重要的 3 个 section、每节最多 4 条 claim，"
+                "并为每条 claim 保留引用；确保 JSON 完整闭合，不要输出解释文字。")
+INVALID_RETRY = dict(reason="schema_validation_failed",
+    instruction="上一次输出不符合 schema 或不是合法 JSON。只修正结构，不补充新事实，返回完整 JSON。")
 
 
 async def model_json(model, schema: type[BaseModel], system: str, user: dict,
-                     store: Store, job_id: str) -> BaseModel:
-    wire_schema = schema.model_json_schema()
-    if issubclass(schema, Report):
-        for definition in wire_schema["$defs"].values():
-            for name, field in definition.get("properties", {}).items():
-                if name.endswith("source_ids"):
-                    kind = "paper" if name == "paper_source_ids" else "repository" if name == "code_source_ids" else None
-                    field["items"]["enum"] = [item["id"] for item in user["evidence"]
-                                               if kind is None or item.get("source_kind") == kind]
-    response = await model.ainvoke([
-        SystemMessage(content=system + "\nReturn ONLY JSON matching this schema:\n"
-                      + json.dumps(wire_schema, ensure_ascii=False)),
-        HumanMessage(content=json.dumps(user, ensure_ascii=False)),
-    ])
-    store.event(job_id, "model_response", dict(schema=schema.__name__, usage=response.usage_metadata,
-                finish_reason=response.response_metadata.get("finish_reason"),
-                content_characters=len(response.content)))
-    return schema.model_validate_json(response.content)
+                     store: Store, job_id: str, max_attempts: int = 2) -> BaseModel:
+    """One structured call plus at most one bounded repair attempt.
+
+    Truncation and schema violations are repaired by re-asking with a narrowed
+    instruction; after the last attempt the job fails with an actionable message
+    instead of a raw pydantic traceback or a silently shortened report.
+    """
+    wire = wire_schema(schema, user)
+    prompt = system + "\nReturn ONLY JSON matching this schema:\n" + json.dumps(wire, ensure_ascii=False)
+    payload = dict(user)
+    last_error = ""
+    for attempt in range(1, max_attempts + 1):
+        response = await model.ainvoke([SystemMessage(content=prompt),
+                                        HumanMessage(content=json.dumps(payload, ensure_ascii=False))])
+        content = response.content or ""
+        finish_reason = (response.response_metadata or {}).get("finish_reason")
+        store.event(job_id, "model_response", dict(schema=schema.__name__, attempt=attempt,
+                    usage=response.usage_metadata, finish_reason=finish_reason,
+                    content_characters=len(content)))
+        if finish_reason == "length":
+            last_error = "模型输出达到 max_tokens 上限被截断"
+            payload = dict(user, retry=TRUNCATED_RETRY)
+            continue
+        try:
+            return schema.model_validate_json(content)
+        except ValidationError as exc:
+            last_error = str(exc)[:1200]
+            payload = dict(user, retry=dict(INVALID_RETRY, error=last_error))
+    raise ModelOutputError(
+        f"模型输出无法解析为 {schema.__name__}（已尝试 {max_attempts} 次）：{last_error}。"
+        f"可缩小问题范围、减少引用证据，或提高 PAPERPILOT_MAX_TOKENS 后重试。")
 
 
 def build_graph(settings: Settings, store: Store, checkpointer, model=None):

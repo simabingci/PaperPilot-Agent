@@ -63,6 +63,30 @@ def docker(*args: str, timeout: int = 30) -> str:
                           encoding="utf-8", timeout=timeout).stdout.strip()
 
 
+def prepare_output_dir(path: Path) -> None:
+    """Let the container's non-root user write results without a world-writable directory."""
+    if os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        try:
+            os.chown(path, 10001, 10001)
+            os.chmod(path, 0o770)
+            return
+        except OSError:
+            pass
+    os.chmod(path, 0o777)
+
+
+def error_code(exc: Exception) -> str:
+    if isinstance(exc, subprocess.CalledProcessError):
+        return "docker_command_failed"
+    if isinstance(exc, httpx.HTTPError):
+        return "snapshot_download_failed"
+    if isinstance(exc, zipfile.BadZipFile):
+        return "snapshot_archive_invalid"
+    if isinstance(exc, OSError):
+        return "filesystem_error"
+    return "recipe_or_output_invalid"
+
+
 def review_recipe(path: Path) -> tuple[Recipe, dict]:
     recipe = Recipe.model_validate_json(path.read_text(encoding="utf-8"))
     adapter = (path.parent / recipe.adapter).resolve()
@@ -115,10 +139,14 @@ def execute_recipe(path: Path, approval: str, runs_dir: Path) -> dict:
         raise ValueError("批准摘要不匹配；请重新 inspect 并核对配方、适配器和镜像")
     run_id = uuid4().hex
     run_dir = (runs_dir / run_id).resolve()
-    run_dir.mkdir(parents=True, mode=0o700)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        # 0o700 is a POSIX concept; on Windows Python turns it into a DACL that blocks
+        # creating the run's own subdirectories.
+        os.chmod(run_dir, 0o700)
     for directory in ["source", "adapter", "output"]:
         (run_dir / directory).mkdir()
-    os.chmod(run_dir / "output", 0o777)
+    prepare_output_dir(run_dir / "output")
     (run_dir / "review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
     record = dict(id=run_id, started_at=datetime.now(UTC).isoformat(), status="running", review=review)
     name = f"paperpilot-run-{run_id}"
@@ -156,10 +184,10 @@ def execute_recipe(path: Path, approval: str, runs_dir: Path) -> dict:
             record.update(submission=submission.model_dump(), comparison=compare_results(submission))
             (run_dir / "comparison-input.json").write_text(submission.model_dump_json(indent=2), encoding="utf-8")
     except subprocess.TimeoutExpired:
-        record.update(status="timed_out", error="实验超过批准的时间预算")
+        record.update(status="timed_out", error_code="timeout", error="实验超过批准的时间预算")
     except (subprocess.CalledProcessError, OSError, ValueError, httpx.HTTPError, zipfile.BadZipFile) as exc:
         detail = exc.stderr if isinstance(exc, subprocess.CalledProcessError) else str(exc)
-        record.update(status="failed", error=detail[:2000])
+        record.update(status="failed", error_code=error_code(exc), error=detail[:2000])
     finally:
         if created:
             # Lifecycle boundary: stop even a timed-out process before collecting its bounded logs.
@@ -168,6 +196,12 @@ def execute_recipe(path: Path, approval: str, runs_dir: Path) -> dict:
             (run_dir / "stdout.log").write_bytes(logs.stdout)
             (run_dir / "stderr.log").write_bytes(logs.stderr)
             subprocess.run(["docker", "rm", "--force", name], capture_output=True, timeout=15)
+        # Disk is not bounded by the container memory limit, so record what the run actually wrote.
+        try:
+            record["output_bytes"] = sum(p.stat().st_size for p in (run_dir / "output").rglob("*")
+                                         if p.is_file() and not p.is_symlink())
+        except OSError:
+            record["output_bytes"] = None
         record["duration_seconds"] = round(time.monotonic() - started, 3)
         record["artifact_hashes"] = {str(p.relative_to(run_dir)): hashlib.sha256(p.read_bytes()).hexdigest()
                                     for p in [run_dir / "review.json", run_dir / "stdout.log", run_dir / "stderr.log"]

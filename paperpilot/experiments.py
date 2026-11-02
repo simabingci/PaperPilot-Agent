@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,6 +36,7 @@ class Target(Contract):
 class Reference(Contract):
     paper_title: str = Field(min_length=1, max_length=500)
     paper_url: str = Field(min_length=1, max_length=500)
+    paper_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     protocol: Protocol
     metrics: list[Target] = Field(min_length=1, max_length=30)
 
@@ -60,10 +62,34 @@ def content_hash(value: dict) -> str:
                                     separators=(",", ":")).encode()).hexdigest()
 
 
+UNKNOWN_MARKERS = {"unknown", "n/a", "na", "tbd", "?", "未确认", "待确认", "不确定", "未知", ""}
+
+
+def normalize_text(value: str) -> str:
+    """Compare protocol text by content, not by spacing or capitalisation."""
+    return re.sub(r"[\s_\-—–]+", "", value).casefold()
+
+
+def is_unknown(value: str) -> bool:
+    return value.strip().casefold() in UNKNOWN_MARKERS
+
+
+def _looks_like_filename(title: str) -> bool:
+    return title.strip().casefold().endswith((".pdf", ".docx", ".md", ".txt"))
+
+
+def same_paper(study_title: str, reference_title: str) -> bool:
+    """Titles that are only file names carry no identity and are not compared."""
+    if _looks_like_filename(study_title) or _looks_like_filename(reference_title):
+        return True
+    return normalize_text(study_title) == normalize_text(reference_title)
+
+
 def compare_results(submission: ResultSubmission) -> dict:
     expected, actual = submission.reference.protocol.model_dump(), submission.observed.protocol.model_dump()
     differences = [dict(field=name, paper=value, actual=actual[name]) for name, value in expected.items()
-                   if value != actual[name] or value.strip().lower() in {"unknown", "未确认", "待确认"}]
+                   if (normalize_text(value) != normalize_text(actual[name])
+                       or is_unknown(value) or is_unknown(actual[name]))]
     reasons = []
     if differences:
         reasons.append("实验协议不一致或存在未确认项")
@@ -113,6 +139,16 @@ def record_result(store: Store, study_id: str, body: ResultSubmission, provenanc
         raise ValueError("需要复现工作区 ID")
     if study["metadata"]["repository"]["commit"] != body.repository_commit:
         raise ValueError("结果的代码 commit 与工作区不一致，请为该版本建立对应工作区")
+    paper = store.source(study["metadata"]["paper_id"])
+    warnings = []
+    declared_sha = body.reference.paper_sha256
+    stored_sha = paper["metadata"].get("sha256")
+    if declared_sha and stored_sha and declared_sha != stored_sha:
+        raise ValueError("结果的论文哈希与工作区论文不一致；请为该论文建立对应工作区")
+    if not same_paper(paper["title"], body.reference.paper_title):
+        # Titles are author-typed labels, so a mismatch is recorded, not treated as proof.
+        warnings.append(f"论文标题与工作区不一致：工作区《{paper['title']}》，"
+                        f"基准《{body.reference.paper_title}》；请人工确认是否为同一篇论文")
     comparison = compare_results(body)
     return store.save_result(study_id, dict(submission=body.model_dump(), comparison=comparison,
-        markdown=comparison_markdown(comparison), provenance=provenance))
+        markdown=comparison_markdown(comparison), provenance=provenance, warnings=warnings))
